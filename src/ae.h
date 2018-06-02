@@ -59,6 +59,9 @@
 /* Macros */
 #define AE_NOTUSED(V) ((void) V)
 
+
+#define MAGIC 0x06121799
+
 struct aeEventLoop;
 
 /* Types and data structures */

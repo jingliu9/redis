@@ -18,6 +18,7 @@ uname_M := $(shell sh -c 'uname -m 2>/dev/null || echo not')
 OPTIMIZATION?=-O2
 DEPENDENCY_TARGETS=hiredis linenoise lua
 NODEPS:=clean distclean
+#$(info $$CC is [${CC}])
 
 # Default settings
 STD=-std=c99 -pedantic -DREDIS_STATIC=''
@@ -63,8 +64,11 @@ endif
 # Override default settings if possible
 -include .make-settings
 
-FINAL_CFLAGS=$(STD) $(WARN) $(OPT) $(DEBUG) $(CFLAGS) $(REDIS_CFLAGS)
-FINAL_LDFLAGS=$(LDFLAGS) $(REDIS_LDFLAGS) $(DEBUG)
+ZEUS_CFLAGS := -I../../../include
+ZEUS_LDFLAGS := -L../../../ -lzeus_posix -Wl,-rpath=${HOME}/workspace/datacenter-OS/
+
+FINAL_CFLAGS=$(STD) $(WARN) $(OPT) $(DEBUG) $(CFLAGS) $(REDIS_CFLAGS) $(ZEUS_CFLAGS)
+FINAL_LDFLAGS=$(LDFLAGS) $(REDIS_LDFLAGS) $(DEBUG) $(ZEUS_LDFLAGS)
 FINAL_LIBS=-lm
 DEBUG=-g -ggdb
 
