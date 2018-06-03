@@ -248,7 +248,8 @@ static int anetSetReuseAddr(char *err, int fd) {
 
 static int anetCreateSocket(char *err, int domain) {
     int s;
-    if ((s = socket(domain, SOCK_STREAM, 0)) == -1) {
+    //if ((s = socket(domain, SOCK_STREAM, 0)) == -1) {
+    if ((s = zeus_queue(domain, SOCK_STREAM, 0)) == -1) {
         anetSetError(err, "creating socket: %s", strerror(errno));
         return ANET_ERR;
     }
@@ -285,7 +286,8 @@ static int anetTcpGenericConnect(char *err, char *addr, int port,
         /* Try to create the socket and to connect it.
          * If we fail in the socket() call, or on connect(), we retry with
          * the next entry in servinfo. */
-        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        //if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        if ((s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
             continue;
         if (anetSetReuseAddr(err,s) == ANET_ERR) goto error;
         if (flags & ANET_CONNECT_NONBLOCK && anetNonBlock(err,s) != ANET_OK)
@@ -299,7 +301,8 @@ static int anetTcpGenericConnect(char *err, char *addr, int port,
                 goto error;
             }
             for (b = bservinfo; b != NULL; b = b->ai_next) {
-                if (bind(s,b->ai_addr,b->ai_addrlen) != -1) {
+                //if (bind(s,b->ai_addr,b->ai_addrlen) != -1) {
+                if (zeus_bind(s,b->ai_addr,b->ai_addrlen) != -1) {
                     bound = 1;
                     break;
                 }
@@ -310,7 +313,8 @@ static int anetTcpGenericConnect(char *err, char *addr, int port,
                 goto error;
             }
         }
-        if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
+        //if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
+        if (zeus_connect(s,p->ai_addr,p->ai_addrlen) == -1) {
             /* If the socket is non-blocking, it is ok for connect() to
              * return an EINPROGRESS error here. */
             if (errno == EINPROGRESS && flags & ANET_CONNECT_NONBLOCK)
@@ -385,7 +389,8 @@ int anetUnixGenericConnect(char *err, char *path, int flags)
             return ANET_ERR;
         }
     }
-    if (connect(s,(struct sockaddr*)&sa,sizeof(sa)) == -1) {
+    //if (connect(s,(struct sockaddr*)&sa,sizeof(sa)) == -1) {
+    if (zeus_connect(s,(struct sockaddr*)&sa,sizeof(sa)) == -1) {
         if (errno == EINPROGRESS &&
             flags & ANET_CONNECT_NONBLOCK)
             return s;
@@ -438,13 +443,15 @@ int anetWrite(int fd, char *buf, int count)
 }
 
 static int anetListen(char *err, int s, struct sockaddr *sa, socklen_t len, int backlog) {
-    if (bind(s,sa,len) == -1) {
+    //if (bind(s,sa,len) == -1) {
+    if (zeus_bind(s,sa,len) == -1) {
         anetSetError(err, "bind: %s", strerror(errno));
         close(s);
         return ANET_ERR;
     }
 
-    if (listen(s, backlog) == -1) {
+    //if (listen(s, backlog) == -1) {
+    if (zeus_listen(s, backlog) == -1) {
         anetSetError(err, "listen: %s", strerror(errno));
         close(s);
         return ANET_ERR;
@@ -479,7 +486,8 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
         return ANET_ERR;
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
-        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        //if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        if ((s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
             continue;
 
         if (af == AF_INET6 && anetV6Only(err,s) == ANET_ERR) goto error;
@@ -531,7 +539,8 @@ int anetUnixServer(char *err, char *path, mode_t perm, int backlog)
 static int anetGenericAccept(char *err, int s, struct sockaddr *sa, socklen_t *len) {
     int fd;
     while(1) {
-        fd = accept(s,sa,len);
+        //fd = accept(s,sa,len);
+        fd = zeus_accept(s,sa,len);
         if (fd == -1) {
             if (errno == EINTR)
                 continue;

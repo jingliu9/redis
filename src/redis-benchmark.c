@@ -46,6 +46,9 @@
 #include "adlist.h"
 #include "zmalloc.h"
 
+#include "../../../include/io-queue_c.h"
+
+
 #define UNUSED(V) ((void) V)
 #define RANDPTR_INITIAL_SIZE 8
 
@@ -261,6 +264,8 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(fd);
     UNUSED(mask);
 
+    printf("redis-benchmark.c/writeHandler\n");
+
     /* Initialize request when nothing was written. */
     if (c->written == 0) {
         /* Enforce upper bound to number of requests. */
@@ -274,10 +279,15 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
         c->start = ustime();
         c->latency = -1;
     }
-
     if (sdslen(c->obuf) > c->written) {
         void *ptr = c->obuf+c->written;
-        ssize_t nwritten = write(c->context->fd,ptr,sdslen(c->obuf)-c->written);
+        // ZEUS
+        //ssize_t nwritten = write(c->context->fd,ptr,sdslen(c->obuf)-c->written);
+        zeus_sgarray sga;
+        sga.num_bufs = 1;
+        sga.bufs[0].buf = (zeus_ioptr)ptr;
+        sga.bufs[0].len = sdslen(c->obuf)-c->written;
+        ssize_t nwritten = zeus_push(c->context->fd, &sga);
         if (nwritten == -1) {
             if (errno != EPIPE)
                 fprintf(stderr, "Writing to socket: %s\n", strerror(errno));
