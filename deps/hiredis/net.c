@@ -51,6 +51,8 @@
 #include <limits.h>
 #include <stdlib.h>
 
+#include "../../../../include/io-queue_c.h"
+
 #include "net.h"
 #include "sds.h"
 
@@ -86,7 +88,8 @@ static int redisSetReuseAddr(redisContext *c) {
 
 static int redisCreateSocket(redisContext *c, int type) {
     int s;
-    if ((s = socket(type, SOCK_STREAM, 0)) == -1) {
+    //if ((s = socket(type, SOCK_STREAM, 0)) == -1) {
+    if ((s = zeus_queue(type, SOCK_STREAM, 0)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
         return REDIS_ERR;
     }
@@ -336,7 +339,8 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
 addrretry:
-        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        //if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        if ((s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
             continue;
 
         c->fd = s;
@@ -361,7 +365,7 @@ addrretry:
             }
 
             for (b = bservinfo; b != NULL; b = b->ai_next) {
-                if (bind(s,b->ai_addr,b->ai_addrlen) != -1) {
+                if (zeus_bind(s,b->ai_addr,b->ai_addrlen) != -1) {
                     bound = 1;
                     break;
                 }
@@ -374,7 +378,8 @@ addrretry:
                 goto error;
             }
         }
-        if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
+        //if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
+        if (zeus_connect(s,p->ai_addr,p->ai_addrlen) == -1) {
             if (errno == EHOSTUNREACH) {
                 redisContextCloseFd(c);
                 continue;
@@ -417,6 +422,7 @@ end:
 
 int redisContextConnectTcp(redisContext *c, const char *addr, int port,
                            const struct timeval *timeout) {
+    printf("hiredis/redisContextConnectTcp\n");
     return _redisContextConnectTcp(c, addr, port, timeout, NULL);
 }
 
@@ -458,7 +464,8 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
 
     sa.sun_family = AF_LOCAL;
     strncpy(sa.sun_path,path,sizeof(sa.sun_path)-1);
-    if (connect(c->fd, (struct sockaddr*)&sa, sizeof(sa)) == -1) {
+    //if (connect(c->fd, (struct sockaddr*)&sa, sizeof(sa)) == -1) {
+    if (zeus_connect(c->fd, (struct sockaddr*)&sa, sizeof(sa)) == -1) {
         if (errno == EINPROGRESS && !blocking) {
             /* This is ok. */
         } else {

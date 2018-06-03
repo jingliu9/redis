@@ -39,6 +39,8 @@
 #include <errno.h>
 #include <ctype.h>
 
+#include "../../../../include/io-queue_c.h"
+
 #include "hiredis.h"
 #include "net.h"
 #include "sds.h"
@@ -795,11 +797,18 @@ int redisBufferRead(redisContext *c) {
     char buf[1024*16];
     int nread;
 
+    printf("hiredis/redisBufferRead\n");
+
     /* Return early when the context has seen an error. */
     if (c->err)
         return REDIS_ERR;
 
+    // ZEUS
     nread = read(c->fd,buf,sizeof(buf));
+    //zeus_sgarray sga;
+    //nread = zeus_pop(c->fd, &sga);
+    //char *ptr = (char*)(sga.bufs[0].buf);
+    //memcpy(buf, ptr, sga.bufs[0].len);
     if (nread == -1) {
         if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
@@ -835,7 +844,10 @@ int redisBufferWrite(redisContext *c, int *done) {
     if (c->err)
         return REDIS_ERR;
 
+    printf("hiredis/redisBufferWrite\n");
+
     if (sdslen(c->obuf) > 0) {
+        // ZEUS
         nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
         if (nwritten == -1) {
             if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {

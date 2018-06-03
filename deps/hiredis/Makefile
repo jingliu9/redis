@@ -41,6 +41,13 @@ CXX:=$(shell sh -c 'type $(CXX) >/dev/null 2>/dev/null && echo $(CXX) || echo g+
 OPTIMIZATION?=-O3
 WARNINGS=-Wall -W -Wstrict-prototypes -Wwrite-strings
 DEBUG_FLAGS?= -g -ggdb
+
+ZEUS_CFLAGS := -I../../../../include
+ZEUS_LDFLAGS := -L../../../../ -lzeus_posix -Wl,-rpath=${HOME}/workspace/datacenter-OS/
+
+CFLAGS += $(ZEUS_CFLAGS)
+LDFLAGS += $(ZEUS_LDFLAGS)
+
 REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CFLAGS) $(WARNINGS) $(DEBUG_FLAGS) $(ARCH)
 REAL_LDFLAGS=$(LDFLAGS) $(ARCH)
 
@@ -66,7 +73,8 @@ ifeq ($(uname_S),Darwin)
   DYLIB_MAKE_CMD=$(CC) -shared -Wl,-install_name,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(LDFLAGS)
 endif
 
-all: $(DYLIBNAME) $(STLIBNAME) hiredis-test $(PKGCONFNAME)
+all: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME)
+#all: $(DYLIBNAME) $(STLIBNAME) hiredis-test $(PKGCONFNAME)
 
 # Deps (use make dep to generate this)
 async.o: async.c fmacros.h async.h hiredis.h read.h sds.h net.h dict.c dict.h
