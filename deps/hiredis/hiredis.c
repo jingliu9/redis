@@ -800,15 +800,18 @@ int redisBufferRead(redisContext *c) {
     printf("hiredis/redisBufferRead\n");
 
     /* Return early when the context has seen an error. */
-    if (c->err)
+    if (c->err){
+        printf("hiredis/redisBufferRead c->err\n");
         return REDIS_ERR;
+    }
 
+    printf("hiredis/redisBufferRead before zeus_pop()\n");
     // ZEUS
-    nread = read(c->fd,buf,sizeof(buf));
-    //zeus_sgarray sga;
-    //nread = zeus_pop(c->fd, &sga);
-    //char *ptr = (char*)(sga.bufs[0].buf);
-    //memcpy(buf, ptr, sga.bufs[0].len);
+    //nread = read(c->fd,buf,sizeof(buf));
+    zeus_sgarray sga;
+    nread = zeus_pop(c->fd, &sga);
+    char *ptr = (char*)(sga.bufs[0].buf);
+    memcpy(buf, ptr, sga.bufs[0].len);
     if (nread == -1) {
         if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
