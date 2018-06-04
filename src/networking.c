@@ -904,13 +904,13 @@ int writeToClient(int fd, client *c, int handler_installed) {
 
     while(clientHasPendingReplies(c)) {
         if (c->bufpos > 0) {
-            nwritten = write(fd,c->buf+c->sentlen,c->bufpos-c->sentlen);
+            //nwritten = write(fd,c->buf+c->sentlen,c->bufpos-c->sentlen);
             // ZEUS
-            //zeus_sgarray sga;
-            //sga.num_bufs = 1;
-            //sga.bufs[0].buf = (zeus_ioptr)(c->buf+c->sentlen);
-            //sga.bufs[0].len = c->bufpos-c->sentlen;
-            //nwritten = zeus_push(fd, &sga);
+            zeus_sgarray sga;
+            sga.num_bufs = 1;
+            sga.bufs[0].buf = (zeus_ioptr)(c->buf+c->sentlen);
+            sga.bufs[0].len = c->bufpos-c->sentlen;
+            nwritten = zeus_push(fd, &sga);
 
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
@@ -1414,6 +1414,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     //nread = read(fd, c->querybuf+qblen, readlen);
     zeus_sgarray sga;
     nread = zeus_pop(fd, &sga);
+    serverLog(LL_WARNING,"zeus_pop return %d\n", nread);
     char *ptr = (char*)(sga.bufs[0].buf);
     memcpy(c->querybuf+qblen, ptr, sga.bufs[0].len);
     if (nread == -1) {
