@@ -39,6 +39,7 @@
 #include <stdint.h> /* uintXX_t, etc */
 #include "sds.h" /* for sds */
 
+#define HIREDIS_ZEUS_DEBUG 0
 
 #define HIREDIS_MAJOR 0
 #define HIREDIS_MINOR 13

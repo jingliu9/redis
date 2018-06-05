@@ -797,7 +797,7 @@ int redisBufferRead(redisContext *c) {
     char buf[1024*16];
     int nread;
 
-    printf("hiredis/redisBufferRead\n");
+    if(HIREDIS_ZEUS_DEBUG) printf("hiredis/redisBufferRead\n");
 
     /* Return early when the context has seen an error. */
     if (c->err){
@@ -805,7 +805,7 @@ int redisBufferRead(redisContext *c) {
         return REDIS_ERR;
     }
 
-    printf("hiredis/redisBufferRead before zeus_pop()\n");
+    if(HIREDIS_ZEUS_DEBUG) printf("hiredis/redisBufferRead before zeus_pop()\n");
     // ZEUS
     //nread = read(c->fd,buf,sizeof(buf));
     zeus_sgarray sga;

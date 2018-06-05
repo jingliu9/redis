@@ -900,7 +900,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
     size_t objlen;
     sds o;
 
-    printf("networking.c/writeToClient\n");
+    if(REDIS_ZEUS_DEBUG) printf("networking.c/writeToClient\n");
 
     while(clientHasPendingReplies(c)) {
         if (c->bufpos > 0) {
@@ -1391,7 +1391,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
 
-    printf("networking.c/readQueryFromClient\n");
+    if(REDIS_ZEUS_DEBUG) printf("networking.c/readQueryFromClient\n");
 
     readlen = PROTO_IOBUF_LEN;
     /* If this is a multi bulk request, and we are processing a bulk reply
@@ -1414,7 +1414,9 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     //nread = read(fd, c->querybuf+qblen, readlen);
     zeus_sgarray sga;
     nread = zeus_pop(fd, &sga);
-    serverLog(LL_WARNING,"zeus_pop return %d\n", nread);
+    //if(REDIS_ZEUS_DEBUG){
+        serverLog(LL_WARNING,"zeus_pop return %d sga.bufs[0].len:%ld\n", nread, sga.bufs[0].len);
+    //}
     char *ptr = (char*)(sga.bufs[0].buf);
     memcpy(c->querybuf+qblen, ptr, sga.bufs[0].len);
     if (nread == -1) {
@@ -1433,6 +1435,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
         /* Append the query buffer to the pending (not applied) buffer
          * of the master. We'll use this buffer later in order to have a
          * copy of the string applied by the last command executed. */
+        if (REDIS_ZEUS_DEBUG) serverLog(LL_WARNING,"c->flags is CLIENT_MASTE %d\n", nread);
         c->pending_querybuf = sdscatlen(c->pending_querybuf,
                                         c->querybuf+qblen,nread);
     }

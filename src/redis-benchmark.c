@@ -264,7 +264,7 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(fd);
     UNUSED(mask);
 
-    printf("redis-benchmark.c/writeHandler\n");
+    if(HIREDIS_ZEUS_DEBUG) printf("redis-benchmark.c/writeHandler\n");
 
     /* Initialize request when nothing was written. */
     if (c->written == 0) {
@@ -288,6 +288,7 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
         sga.bufs[0].buf = (zeus_ioptr)ptr;
         sga.bufs[0].len = sdslen(c->obuf)-c->written;
         ssize_t nwritten = zeus_push(c->context->fd, &sga);
+        if(HIREDIS_ZEUS_DEBUG) printf("return value of zeus_push() %zd\n", nwritten);
         if (nwritten == -1) {
             if (errno != EPIPE)
                 fprintf(stderr, "Writing to socket: %s\n", strerror(errno));

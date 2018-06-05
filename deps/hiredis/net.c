@@ -422,7 +422,7 @@ end:
 
 int redisContextConnectTcp(redisContext *c, const char *addr, int port,
                            const struct timeval *timeout) {
-    printf("hiredis/redisContextConnectTcp\n");
+    //printf("hiredis/redisContextConnectTcp\n");
     return _redisContextConnectTcp(c, addr, port, timeout, NULL);
 }
 
