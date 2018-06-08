@@ -11,6 +11,11 @@
 #
 # Dependencies are stored in the Makefile.dep file. To rebuild this file
 # Just use 'make dep', but this is only needed by developers.
+#
+ZEUS_SRC_DIR=${HOME}/datacenter-OS/
+ifndef ZEUS_SRC_DIR
+	ZEUS_SRC_DIR = ${HOME}/msr/datacenter-os/src
+endif
 
 release_hdr := $(shell sh -c './mkreleasehdr.sh')
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
@@ -64,8 +69,8 @@ endif
 # Override default settings if possible
 -include .make-settings
 
-ZEUS_CFLAGS := -I../../../include
-ZEUS_LDFLAGS := -L../../../ -lzeus_posix -Wl,-rpath=${HOME}/workspace/datacenter-OS/
+ZEUS_CFLAGS := -I$(ZEUS_SRC_DIR)
+ZEUS_LDFLAGS := -L$(ZEUS_SRC_DIR) -lzeus_posix -Wl,-rpath,$(ZEUS_SRC_DIR)
 
 FINAL_CFLAGS=$(STD) $(WARN) $(OPT) $(DEBUG) $(CFLAGS) $(REDIS_CFLAGS)
 FINAL_LDFLAGS=$(LDFLAGS) $(REDIS_LDFLAGS) $(DEBUG)

@@ -780,6 +780,7 @@ void unlinkClient(client *c) {
 
 void freeClient(client *c) {
     listNode *ln;
+    //printf("@@@@@@freeClient()\n");
 
     /* If it is our master that's beging disconnected we should make sure
      * to cache the state to try a partial resynchronization later.
@@ -904,6 +905,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
 
     while(clientHasPendingReplies(c)) {
         if (c->bufpos > 0) {
+            //printf("@@@@@@writeToClient/write()\n");
             //nwritten = write(fd,c->buf+c->sentlen,c->bufpos-c->sentlen);
             // ZEUS
             zeus_sgarray sga;
@@ -1411,14 +1413,20 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     qblen = sdslen(c->querybuf);
     if (c->querybuf_peak < qblen) c->querybuf_peak = qblen;
     c->querybuf = sdsMakeRoomFor(c->querybuf, readlen);
+    //printf("@@@@@@readQueryFromClient/read()\n");
     //nread = read(fd, c->querybuf+qblen, readlen);
     zeus_sgarray sga;
     nread = zeus_pop(fd, &sga);
-    //if(REDIS_ZEUS_DEBUG){
-        serverLog(LL_WARNING,"zeus_pop return %d sga.bufs[0].len:%ld\n", nread, sga.bufs[0].len);
-    //}
+    if(REDIS_ZEUS_DEBUG){
+        //serverLog(LL_WARNING,"zeus_pop return %d sga.bufs[0].len:%ld\n", nread, sga.bufs[0].len);
+    }
     char *ptr = (char*)(sga.bufs[0].buf);
-    memcpy(c->querybuf+qblen, ptr, sga.bufs[0].len);
+    if(nread == C_ZEUS_IO_ERR_NO){
+        // regard as EAGAIN
+        return;
+    }else if(nread != -1 && nread != 0){
+        memcpy(c->querybuf+qblen, ptr, sga.bufs[0].len);
+    }
     if (nread == -1) {
         if (errno == EAGAIN) {
             return;

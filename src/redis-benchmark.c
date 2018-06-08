@@ -46,7 +46,7 @@
 #include "adlist.h"
 #include "zmalloc.h"
 
-#include "../../../include/io-queue_c.h"
+#include "include/io-queue_c.h"
 
 
 #define UNUSED(V) ((void) V)
@@ -282,6 +282,7 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     if (sdslen(c->obuf) > c->written) {
         void *ptr = c->obuf+c->written;
         // ZEUS
+        //printf("@@@@@@writeHandler/write()\n");
         //ssize_t nwritten = write(c->context->fd,ptr,sdslen(c->obuf)-c->written);
         zeus_sgarray sga;
         sga.num_bufs = 1;

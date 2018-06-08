@@ -807,11 +807,17 @@ int redisBufferRead(redisContext *c) {
 
     if(HIREDIS_ZEUS_DEBUG) printf("hiredis/redisBufferRead before zeus_pop()\n");
     // ZEUS
+    //printf("@@@@@@redisBufferRead/read()\n");
     //nread = read(c->fd,buf,sizeof(buf));
     zeus_sgarray sga;
     nread = zeus_pop(c->fd, &sga);
     char *ptr = (char*)(sga.bufs[0].buf);
-    memcpy(buf, ptr, sga.bufs[0].len);
+    if(nread == C_ZEUS_IO_ERR_NO){
+        // try again later
+        return REDIS_OK;
+    }else if(nread != -1 && nread != 0){
+        memcpy(buf, ptr, sga.bufs[0].len);
+    }
     if (nread == -1) {
         if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
