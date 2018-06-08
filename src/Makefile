@@ -12,8 +12,8 @@
 # Dependencies are stored in the Makefile.dep file. To rebuild this file
 # Just use 'make dep', but this is only needed by developers.
 #
-ZEUS_SRC_DIR=${HOME}/datacenter-OS/
 ifndef ZEUS_SRC_DIR
+	#ZEUS_SRC_DIR=${HOME}/datacenter-OS/
 	ZEUS_SRC_DIR = ${HOME}/msr/datacenter-os/src
 endif
 
