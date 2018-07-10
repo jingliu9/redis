@@ -46,6 +46,7 @@
                            loop iteration. Useful when you want to persist
                            things to disk before sending replies, and want
                            to do that in a group fashion. */
+#define AE_LIB_LISTEN 7 /* Distinguish between read connect() or read write() */
 
 #define AE_FILE_EVENTS 1
 #define AE_TIME_EVENTS 2
@@ -107,6 +108,13 @@ typedef struct aeEventLoop {
     void *apidata; /* This is used for polling API specific data */
     aeBeforeSleepProc *beforesleep;
     aeBeforeSleepProc *aftersleep;
+    /* _JL_ */
+    int *read_fds;
+    int read_fd_sum;
+    int *listen_fds;
+    int listen_fd_sum;
+    int *write_fds;
+    int write_fd_sum;
 } aeEventLoop;
 
 /* Prototypes */

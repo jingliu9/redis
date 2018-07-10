@@ -69,6 +69,7 @@ int listMatchObjects(void *a, void *b) {
 
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
+    printf("createClient fd:%d\n", fd);
 
     /* passing -1 as fd it is possible to create a non connected client.
      * This is useful since all the commands needs to be executed
@@ -610,6 +611,7 @@ int clientHasPendingReplies(client *c) {
 #define MAX_ACCEPTS_PER_CALL 1000
 static void acceptCommonHandler(int fd, int flags, char *ip) {
     client *c;
+    printf("acceptCommonHandler fd %d\n", fd);
     if ((c = createClient(fd)) == NULL) {
         serverLog(LL_WARNING,
             "Error registering fd event for the new client: %s (fd=%d)",
@@ -684,6 +686,7 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
     UNUSED(privdata);
+    //printf("acceptTcpHandler @@@@@@max:%d\n", max);
 
     while(max--) {
         cfd = anetTcpAccept(server.neterr, fd, cip, sizeof(cip), &cport);
@@ -1388,7 +1391,7 @@ void processInputBuffer(client *c) {
 
 void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     client *c = (client*) privdata;
-    int nread, readlen;
+    int nread, readlen, npop;
     size_t qblen;
     UNUSED(el);
     UNUSED(mask);
@@ -1413,18 +1416,26 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     qblen = sdslen(c->querybuf);
     if (c->querybuf_peak < qblen) c->querybuf_peak = qblen;
     c->querybuf = sdsMakeRoomFor(c->querybuf, readlen);
-    //printf("@@@@@@readQueryFromClient/read()\n");
+    //printf("netoworking.c@@@@@@readQueryFromClient/read(%d)\n", fd);
     //nread = read(fd, c->querybuf+qblen, readlen);
     zeus_sgarray sga;
-    nread = zeus_pop(fd, &sga);
-    if(REDIS_ZEUS_DEBUG){
-        //serverLog(LL_WARNING,"zeus_pop return %d sga.bufs[0].len:%ld\n", nread, sga.bufs[0].len);
+    npop = zeus_pop(fd, &sga);
+    if (npop == 0){
+        nread = sga.bufs[1].len;
+    }else{
+        nread = -1;
     }
+    //printf("@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
+    //if(REDIS_ZEUS_DEBUG){
+        //serverLog(LL_WARNING,"zeus_pop return %d sga.bufs[0].len:%ld\n", nread, sga.bufs[0].len);
+    //}
     char *ptr = (char*)(sga.bufs[0].buf);
-    if(nread == C_ZEUS_IO_ERR_NO){
+    //if(nread == C_ZEUS_IO_ERR_NO){
+    if (npop > 0 || npop == C_ZEUS_IO_ERR_NO) {
         // regard as EAGAIN
         return;
-    }else if(nread != -1 && nread != 0){
+    //}else if(nread != -1 && nread != 0){
+    }else if(nread != -1 && nread != 0) {
         memcpy(c->querybuf+qblen, ptr, sga.bufs[0].len);
     }
     if (nread == -1) {

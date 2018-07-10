@@ -328,6 +328,7 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
 static client createClient(char *cmd, size_t len, client from) {
     int j;
     client c = zmalloc(sizeof(struct _client));
+    printf("redis-benchmar.c@@@@@@createClient\n");
 
     if (config.hostsocket == NULL) {
         c->context = redisConnectNonBlock(config.hostip,config.hostport);
@@ -415,8 +416,9 @@ static client createClient(char *cmd, size_t len, client from) {
             }
         }
     }
-    if (config.idlemode == 0)
+    if (config.idlemode == 0) {
         aeCreateFileEvent(config.el,c->context->fd,AE_WRITABLE,writeHandler,c);
+    }
     listAddNodeTail(config.clients,c);
     config.liveclients++;
     return c;
@@ -482,6 +484,7 @@ static void benchmark(char *title, char *cmd, int len) {
 
     config.start = mstime();
     aeMain(config.el);
+    sleep(10000);
     config.totlatency = mstime()-config.start;
 
     showLatencyReport();
