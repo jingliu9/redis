@@ -209,7 +209,7 @@ int anetGenericResolve(char *err, char *host, char *ipbuf, size_t ipbuf_len,
     memset(&hints,0,sizeof(hints));
     if (flags & ANET_IP_ONLY) hints.ai_flags = AI_NUMERICHOST;
     hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;  /* specify socktype to avoid dups */
+    hints.ai_socktype = SOCK_DGRAM;  /* specify socktype to avoid dups */
 
     if ((rv = getaddrinfo(host, NULL, &hints, &info)) != 0) {
         anetSetError(err, "%s", gai_strerror(rv));
@@ -249,7 +249,7 @@ static int anetSetReuseAddr(char *err, int fd) {
 static int anetCreateSocket(char *err, int domain) {
     int s;
     //if ((s = socket(domain, SOCK_STREAM, 0)) == -1) {
-    if ((s = zeus_queue(domain, SOCK_STREAM, 0)) == -1) {
+    if ((s = zeus_queue(domain, SOCK_DGRAM, 0)) == -1) {
         anetSetError(err, "creating socket: %s", strerror(errno));
         return ANET_ERR;
     }
@@ -276,7 +276,7 @@ static int anetTcpGenericConnect(char *err, char *addr, int port,
     snprintf(portstr,sizeof(portstr),"%d",port);
     memset(&hints,0,sizeof(hints));
     hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_socktype = SOCK_DGRAM;
 
     if ((rv = getaddrinfo(addr,portstr,&hints,&servinfo)) != 0) {
         anetSetError(err, "%s", gai_strerror(rv));
@@ -450,12 +450,14 @@ static int anetListen(char *err, int s, struct sockaddr *sa, socklen_t len, int 
         return ANET_ERR;
     }
 
+#if 0
     //if (listen(s, backlog) == -1) {
     if (zeus_listen(s, backlog) == -1) {
         anetSetError(err, "listen: %s", strerror(errno));
         close(s);
         return ANET_ERR;
     }
+#endif
     return ANET_OK;
 }
 
@@ -478,7 +480,7 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
     snprintf(_port,6,"%d",port);
     memset(&hints,0,sizeof(hints));
     hints.ai_family = af;
-    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = AI_PASSIVE;    /* No effect if bindaddr != NULL */
 
     if ((rv = getaddrinfo(bindaddr,_port,&hints,&servinfo)) != 0) {
@@ -538,6 +540,8 @@ int anetUnixServer(char *err, char *path, mode_t perm, int backlog)
 
 static int anetGenericAccept(char *err, int s, struct sockaddr *sa, socklen_t *len) {
     int fd;
+    fd = s;
+#if 0
     while(1) {
         //fd = accept(s,sa,len);
         fd = zeus_accept(s,sa,len);
@@ -551,6 +555,7 @@ static int anetGenericAccept(char *err, int s, struct sockaddr *sa, socklen_t *l
         }
         break;
     }
+#endif
     return fd;
 }
 

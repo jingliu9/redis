@@ -1101,7 +1101,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
                 break;
             }
          }
-
+#if 0
          /* Trigger an AOF rewrite if needed. */
          if (server.aof_state == AOF_ON &&
              server.rdb_child_pid == -1 &&
@@ -1117,6 +1117,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
                 rewriteAppendOnlyFileBackground();
             }
          }
+#endif
     }
 
 

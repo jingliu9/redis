@@ -679,6 +679,8 @@ typedef struct readyList {
 typedef struct client {
     uint64_t id;            /* Client incremental unique ID. */
     int fd;                 /* Client socket. */
+    struct sockaddr_in addr; 		/* client addr for sendto/recvfrom */
+    int inflight;
     redisDb *db;            /* Pointer to currently SELECTed DB. */
     robj *name;             /* As set by CLIENT SETNAME. */
     sds querybuf;           /* Buffer we use to accumulate client queries. */

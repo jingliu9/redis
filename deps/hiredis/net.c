@@ -89,7 +89,7 @@ static int redisSetReuseAddr(redisContext *c) {
 static int redisCreateSocket(redisContext *c, int type) {
     int s;
     //if ((s = socket(type, SOCK_STREAM, 0)) == -1) {
-    if ((s = zeus_queue(type, SOCK_STREAM, 0)) == -1) {
+    if ((s = zeus_queue(type, SOCK_DGRAM, 0)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
         return REDIS_ERR;
     }
@@ -171,11 +171,13 @@ int redisKeepAlive(redisContext *c, int interval) {
 
 static int redisSetTcpNoDelay(redisContext *c) {
     int yes = 1;
+#if 0
     if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(TCP_NODELAY)");
         redisContextCloseFd(c);
         return REDIS_ERR;
     }
+#endif
     return REDIS_OK;
 }
 
@@ -323,7 +325,7 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     snprintf(_port, 6, "%d", port);
     memset(&hints,0,sizeof(hints));
     hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_socktype = SOCK_DGRAM;
 
     /* Try with IPv6 if no IPv4 address was found. We do it in this order since
      * in a Redis client you can't afford to test if you have IPv6 connectivity

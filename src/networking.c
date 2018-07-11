@@ -135,6 +135,7 @@ client *createClient(int fd) {
     c->peerid = NULL;
     listSetFreeMethod(c->pubsub_patterns,decrRefCountVoid);
     listSetMatchMethod(c->pubsub_patterns,listMatchObjects);
+    c->inflight = 0;
     if (fd != -1) listAddNodeTail(server.clients,c);
     initClientMultiState(c);
     return c;
@@ -912,6 +913,8 @@ int writeToClient(int fd, client *c, int handler_installed) {
             sga.num_bufs = 1;
             sga.bufs[0].buf = (zeus_ioptr)(c->buf+c->sentlen);
             sga.bufs[0].len = c->bufpos-c->sentlen;
+            sga.addr.sin_port = c->addr.sin_port;
+            sga.addr.sin_addr.s_addr = c->addr.sin_addr.s_addr;
             nwritten = zeus_push(fd, &sga);
 
             if (nwritten <= 0) break;
@@ -995,6 +998,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
             freeClient(c);
             return C_ERR;
         }
+        c->inflight = 0;
     }
     return C_OK;
 }
@@ -1393,6 +1397,12 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
 
+    if(c->inflight > 0) {
+      return;
+    } else {
+      c->inflight++;
+    }
+
     if(REDIS_ZEUS_DEBUG) printf("networking.c/readQueryFromClient\n");
 
     readlen = PROTO_IOBUF_LEN;
@@ -1417,6 +1427,8 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     //nread = read(fd, c->querybuf+qblen, readlen);
     zeus_sgarray sga;
     nread = zeus_pop(fd, &sga);
+    c->addr.sin_port = sga.addr.sin_port;
+    c->addr.sin_addr.s_addr = sga.addr.sin_addr.s_addr;
     if(REDIS_ZEUS_DEBUG){
         //serverLog(LL_WARNING,"zeus_pop return %d sga.bufs[0].len:%ld\n", nread, sga.bufs[0].len);
     }
