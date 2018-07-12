@@ -14,7 +14,7 @@
 #
 ifndef ZEUS_SRC_DIR
 	#ZEUS_SRC_DIR=${HOME}/datacenter-OS/
-	ZEUS_SRC_DIR = ${HOME}/datacenter-os/
+	ZEUS_SRC_DIR = ${HOME}/datacenter-OS/
 endif
 
 release_hdr := $(shell sh -c './mkreleasehdr.sh')
