@@ -288,8 +288,17 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
         sga.num_bufs = 1;
         sga.bufs[0].buf = (zeus_ioptr)ptr;
         sga.bufs[0].len = sdslen(c->obuf)-c->written;
-        ssize_t nwritten = zeus_push(c->context->fd, &sga);
-        if(HIREDIS_ZEUS_DEBUG) printf("return value of zeus_push() %zd\n", nwritten);
+        ssize_t nwritten, npush; 
+        npush = zeus_push(c->context->fd, &sga);
+        printf("return value of zeus_push() %zd\n", nwritten);
+        if(npush == 0){
+            // push success
+            nwritten = sga.bufs[0].len;
+            printf("nwritten set to:%d\n", nwritten);
+        }else{
+            nwritten = -1;
+            errno = EAGAIN;
+        }
         if (nwritten == -1) {
             if (errno != EPIPE)
                 fprintf(stderr, "Writing to socket: %s\n", strerror(errno));
@@ -417,7 +426,8 @@ static client createClient(char *cmd, size_t len, client from) {
         }
     }
     if (config.idlemode == 0) {
-        aeCreateFileEvent(config.el,c->context->fd,AE_WRITABLE,writeHandler,c);
+        //aeCreateFileEvent(config.el,c->context->fd,AE_WRITABLE,writeHandler,c);
+        writeHandler(config.el,c->context->fd, c, AE_WRITABLE);
     }
     listAddNodeTail(config.clients,c);
     config.liveclients++;
@@ -484,7 +494,7 @@ static void benchmark(char *title, char *cmd, int len) {
 
     config.start = mstime();
     aeMain(config.el);
-    sleep(10000);
+    //sleep(10000);
     config.totlatency = mstime()-config.start;
 
     showLatencyReport();

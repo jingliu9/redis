@@ -310,7 +310,9 @@ void _addReplyStringToList(client *c, const char *s, size_t len) {
  * -------------------------------------------------------------------------- */
 
 void addReply(client *c, robj *obj) {
+    printf("addReply list_len:%d\n", listLength(server.clients_pending_write));
     if (prepareClientToWrite(c) != C_OK) return;
+    printf("addReply, has prepare client to write, list_len:%d\n", listLength(server.clients_pending_write));
 
     /* This is an important place where we can avoid copy-on-write
      * when there is a saving child running, avoiding touching the
@@ -686,10 +688,11 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
     UNUSED(privdata);
-    //printf("acceptTcpHandler @@@@@@max:%d\n", max);
+    printf("acceptTcpHandler @@@@@@ max:%d fd:%d\n", max, fd);
 
     while(max--) {
         cfd = anetTcpAccept(server.neterr, fd, cip, sizeof(cip), &cport);
+        printf("acceptTcpHandler :%d\n", cfd);
         if (cfd == ANET_ERR) {
             if (errno != EWOULDBLOCK)
                 serverLog(LL_WARNING,
@@ -904,7 +907,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
     size_t objlen;
     sds o;
 
-    if(REDIS_ZEUS_DEBUG) printf("networking.c/writeToClient\n");
+    printf("networking.c/writeToClient fd:%d\n", fd);
 
     while(clientHasPendingReplies(c)) {
         if (c->bufpos > 0) {
@@ -915,7 +918,9 @@ int writeToClient(int fd, client *c, int handler_installed) {
             sga.num_bufs = 1;
             sga.bufs[0].buf = (zeus_ioptr)(c->buf+c->sentlen);
             sga.bufs[0].len = c->bufpos-c->sentlen;
+            printf("before zeus_push\n");
             nwritten = zeus_push(fd, &sga);
+            printf("after zeus_push\n");
 
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
@@ -971,6 +976,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
              zmalloc_used_memory() < server.maxmemory) &&
             !(c->flags & CLIENT_SLAVE)) break;
     }
+    printf("writeToClient, endofpush() nwritten:%d\n", nwritten);
     server.stat_net_output_bytes += totwritten;
     if (nwritten == -1) {
         if (errno == EAGAIN) {
@@ -999,6 +1005,9 @@ int writeToClient(int fd, client *c, int handler_installed) {
             return C_ERR;
         }
     }
+    printf("return from writeToClient\n");
+    server.el->write_fds[fd] = -1;
+    server.el->write_fd_sum--;
     return C_OK;
 }
 
@@ -1007,6 +1016,7 @@ void sendReplyToClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
     writeToClient(fd,privdata,1);
+    //sleep(5*60);
 }
 
 /* This function is called just before entering the event loop, in the hope
@@ -1017,6 +1027,7 @@ int handleClientsWithPendingWrites(void) {
     listIter li;
     listNode *ln;
     int processed = listLength(server.clients_pending_write);
+    printf("handleClientsWithPendingWrites processed %d\n", processed);
 
     listRewind(server.clients_pending_write,&li);
     while((ln = listNext(&li))) {
@@ -1047,6 +1058,10 @@ int handleClientsWithPendingWrites(void) {
                     freeClientAsync(c);
             }
         }
+    }
+    if(processed> 0){
+        //sleep(300);
+        //sleep(1);
     }
     return processed;
 }
@@ -1329,6 +1344,7 @@ int processMultibulkBuffer(client *c) {
  * or because a client was blocked and later reactivated, so there could be
  * pending query buffer, already representing a full command, to process. */
 void processInputBuffer(client *c) {
+    printf("processInputBuffer\n");
     server.current_client = c;
     /* Keep processing while there is something in the input buffer */
     while(sdslen(c->querybuf)) {
@@ -1421,7 +1437,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     zeus_sgarray sga;
     npop = zeus_pop(fd, &sga);
     if (npop == 0){
-        nread = sga.bufs[1].len;
+        nread = sga.bufs[0].len;
     }else{
         nread = -1;
     }
@@ -1482,6 +1498,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
      * the sub-slaves and to the replication backlog. */
     if (!(c->flags & CLIENT_MASTER)) {
         processInputBuffer(c);
+        printf("after process Input buffer\n");
     } else {
         size_t prev_offset = c->reploff;
         processInputBuffer(c);
@@ -2075,6 +2092,7 @@ int clientsArePaused(void) {
 int processEventsWhileBlocked(void) {
     int iterations = 4; /* See the function top-comment. */
     int count = 0;
+    printf("processEventsWhileBlocked\n");
     while (iterations--) {
         int events = 0;
         events += aeProcessEvents(server.el, AE_FILE_EVENTS|AE_DONT_WAIT);

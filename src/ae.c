@@ -191,7 +191,7 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
 
 void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
 {
-    printf("ae.c/aeDeleteEventLoop @@@@@@fd:%d\n", fd);
+    printf("ae.c/aeDeleteEvent @@@@@@fd:%d\n", fd);
     if (fd >= eventLoop->setsize) return;
     aeFileEvent *fe = &eventLoop->events[fd];
     if (fe->mask == AE_NONE) return;

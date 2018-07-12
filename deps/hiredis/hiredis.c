@@ -795,7 +795,7 @@ int redisEnableKeepAlive(redisContext *c) {
  * see if there is a reply available. */
 int redisBufferRead(redisContext *c) {
     char buf[1024*16];
-    int nread;
+    int nread, npop, nwait;
 
     if(HIREDIS_ZEUS_DEBUG) printf("hiredis/redisBufferRead\n");
 
@@ -810,13 +810,24 @@ int redisBufferRead(redisContext *c) {
     //printf("@@@@@@redisBufferRead/read()\n");
     //nread = read(c->fd,buf,sizeof(buf));
     zeus_sgarray sga;
-    nread = zeus_pop(c->fd, &sga);
+    npop = zeus_pop(c->fd, &sga);
+    if(npop == 0){
+        // pop success
+        nread = sga.bufs[0].len;
+    }else{
+        nread = -1;
+        nwait = zeus_wait(npop, &sga);
+        nread = sga.bufs[0].len;
+        printf("return value of nwait:%d nread:%d\n", nwait, nread);
+    }
     char *ptr = (char*)(sga.bufs[0].buf);
     if(nread == C_ZEUS_IO_ERR_NO){
         // try again later
         return REDIS_OK;
     }else if(nread != -1 && nread != 0){
-        memcpy(buf, ptr, sga.bufs[0].len);
+        printf("will do memcpy nread%d\n", nread);
+        memcpy(buf, ptr, nread);
+        printf("copy to buf:%s\n", buf);
     }
     if (nread == -1) {
         if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
@@ -826,9 +837,11 @@ int redisBufferRead(redisContext *c) {
             return REDIS_ERR;
         }
     } else if (nread == 0) {
+        printf("nread == 0\n");
         __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
         return REDIS_ERR;
     } else {
+        printf("will call redisReaderFeed\n");
         if (redisReaderFeed(c->reader,buf,nread) != REDIS_OK) {
             __redisSetError(c,c->reader->err,c->reader->errstr);
             return REDIS_ERR;
