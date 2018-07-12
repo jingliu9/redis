@@ -688,11 +688,11 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
     UNUSED(privdata);
-    printf("acceptTcpHandler @@@@@@ max:%d fd:%d\n", max, fd);
+    //printf("acceptTcpHandler @@@@@@ max:%d fd:%d\n", max, fd);
 
     while(max--) {
         cfd = anetTcpAccept(server.neterr, fd, cip, sizeof(cip), &cport);
-        printf("acceptTcpHandler :%d\n", cfd);
+        //printf("acceptTcpHandler :%d\n", cfd);
         if (cfd == ANET_ERR) {
             if (errno != EWOULDBLOCK)
                 serverLog(LL_WARNING,
@@ -904,6 +904,7 @@ void freeClientsInAsyncFreeQueue(void) {
  * is still valid after the call, C_ERR if it was freed. */
 int writeToClient(int fd, client *c, int handler_installed) {
     ssize_t nwritten = 0, totwritten = 0;
+    ssize_t npush;
     size_t objlen;
     sds o;
 
@@ -919,8 +920,18 @@ int writeToClient(int fd, client *c, int handler_installed) {
             sga.bufs[0].buf = (zeus_ioptr)(c->buf+c->sentlen);
             sga.bufs[0].len = c->bufpos-c->sentlen;
             printf("before zeus_push\n");
-            nwritten = zeus_push(fd, &sga);
-            printf("after zeus_push\n");
+            //nwritten = zeus_push(fd, &sga);
+            npush = zeus_push(fd, &sga);
+            if(npush == 0){
+                // push success
+                nwritten = sga.bufs[0].len;
+                printf("zeus_push success in server\n");
+                //sleep(5);
+            }else{
+                // push return qtoken
+                nwritten = sga.bufs[0].len;
+            }
+            printf("after zeus_push npush:%d\n", npush);
 
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
@@ -943,6 +954,8 @@ int writeToClient(int fd, client *c, int handler_installed) {
 
             // ZEUS
             //nwritten = write(fd, o + c->sentlen, objlen - c->sentlen);
+            printf("NO call here\n");
+            exit(1);
             nwritten = write(fd, o + c->sentlen, objlen - c->sentlen);
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
@@ -1015,8 +1028,8 @@ int writeToClient(int fd, client *c, int handler_installed) {
 void sendReplyToClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
+    printf("sendReplyToClient\n");
     writeToClient(fd,privdata,1);
-    //sleep(5*60);
 }
 
 /* This function is called just before entering the event loop, in the hope
@@ -1027,7 +1040,7 @@ int handleClientsWithPendingWrites(void) {
     listIter li;
     listNode *ln;
     int processed = listLength(server.clients_pending_write);
-    printf("handleClientsWithPendingWrites processed %d\n", processed);
+    //printf("handleClientsWithPendingWrites processed %d\n", processed);
 
     listRewind(server.clients_pending_write,&li);
     while((ln = listNext(&li))) {
@@ -1058,10 +1071,6 @@ int handleClientsWithPendingWrites(void) {
                     freeClientAsync(c);
             }
         }
-    }
-    if(processed> 0){
-        //sleep(300);
-        //sleep(1);
     }
     return processed;
 }
@@ -1407,12 +1416,13 @@ void processInputBuffer(client *c) {
 
 void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     client *c = (client*) privdata;
-    int nread, readlen, npop;
+    int nread, readlen, npop, nwait;
     size_t qblen;
     UNUSED(el);
     UNUSED(mask);
+    UNUSED(nwait);
 
-    if(REDIS_ZEUS_DEBUG) printf("networking.c/readQueryFromClient\n");
+    //if(REDIS_ZEUS_DEBUG) printf("networking.c/readQueryFromClient fd:%d\n", fd);
 
     readlen = PROTO_IOBUF_LEN;
     /* If this is a multi bulk request, and we are processing a bulk reply
@@ -1435,22 +1445,41 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     //printf("netoworking.c@@@@@@readQueryFromClient/read(%d)\n", fd);
     //nread = read(fd, c->querybuf+qblen, readlen);
     zeus_sgarray sga;
+    /**
+    // Use zeus_pop
     npop = zeus_pop(fd, &sga);
     if (npop == 0){
         nread = sga.bufs[0].len;
+        printf("@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
+        sleep(5);
     }else{
         nread = -1;
+        // nwait = zeus_wait(npop, &sga);
+        // nread = sga.bufs[0].len;
+        // printf("return value of nwait:%d nread:%d\n", nwait, nread);
     }
     //printf("@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
-    //if(REDIS_ZEUS_DEBUG){
-        //serverLog(LL_WARNING,"zeus_pop return %d sga.bufs[0].len:%ld\n", nread, sga.bufs[0].len);
-    //}
+    **/
+
+    // use light_pop
+    npop = zeus_light_pop(fd, &sga);
+    if(npop <= 0){
+        // make sure handled as EAGAIN
+        nread = -1;
+        npop = 1;
+    }else{
+        nread = npop;
+        if(nread != sga.bufs[0].len){
+            printf("Error, nread:%d, len:%d\n", nread, sga.bufs[0].len);
+            exit(1);
+        }
+        npop = 0;
+    }
+
     char *ptr = (char*)(sga.bufs[0].buf);
-    //if(nread == C_ZEUS_IO_ERR_NO){
     if (npop > 0 || npop == C_ZEUS_IO_ERR_NO) {
         // regard as EAGAIN
         return;
-    //}else if(nread != -1 && nread != 0){
     }else if(nread != -1 && nread != 0) {
         memcpy(c->querybuf+qblen, ptr, sga.bufs[0].len);
     }

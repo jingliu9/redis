@@ -797,7 +797,6 @@ int redisBufferRead(redisContext *c) {
     char buf[1024*16];
     int nread, npop, nwait;
 
-    if(HIREDIS_ZEUS_DEBUG) printf("hiredis/redisBufferRead\n");
 
     /* Return early when the context has seen an error. */
     if (c->err){
@@ -810,6 +809,8 @@ int redisBufferRead(redisContext *c) {
     //printf("@@@@@@redisBufferRead/read()\n");
     //nread = read(c->fd,buf,sizeof(buf));
     zeus_sgarray sga;
+    /**
+    // use zeus_pop
     npop = zeus_pop(c->fd, &sga);
     if(npop == 0){
         // pop success
@@ -819,6 +820,21 @@ int redisBufferRead(redisContext *c) {
         nwait = zeus_wait(npop, &sga);
         nread = sga.bufs[0].len;
         printf("return value of nwait:%d nread:%d\n", nwait, nread);
+    }**/
+
+    // use zeus_light_pop
+    npop = zeus_light_pop(c->fd, &sga);
+    if(npop <= 0){
+        // make sure handled as EAGAIN
+        nread = -1;
+        npop = 1;
+    }else{
+        nread = npop;
+        if(nread != sga.bufs[0].len){
+            printf("Error, nread:%d, len:%d\n", nread, sga.bufs[0].len);
+            exit(1);
+        }
+        npop = 0;
     }
     char *ptr = (char*)(sga.bufs[0].buf);
     if(nread == C_ZEUS_IO_ERR_NO){
@@ -847,6 +863,7 @@ int redisBufferRead(redisContext *c) {
             return REDIS_ERR;
         }
     }
+    //printf("return of redisBufferRead\n");
     return REDIS_OK;
 }
 

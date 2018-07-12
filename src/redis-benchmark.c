@@ -150,11 +150,14 @@ static void freeAllClients(void) {
 }
 
 static void resetClient(client c) {
+    printf("resetClient\n");
     aeDeleteFileEvent(config.el,c->context->fd,AE_WRITABLE);
     aeDeleteFileEvent(config.el,c->context->fd,AE_READABLE);
-    aeCreateFileEvent(config.el,c->context->fd,AE_WRITABLE,writeHandler,c);
+    //aeCreateFileEvent(config.el,c->context->fd,AE_WRITABLE,writeHandler,c);
     c->written = 0;
     c->pending = config.pipeline;
+    writeHandler(config.el,c->context->fd, c, AE_WRITABLE);
+    //sleep(10);
 }
 
 static void randomizeClientKey(client c) {
@@ -174,6 +177,8 @@ static void randomizeClientKey(client c) {
 }
 
 static void clientDone(client c) {
+    printf("clientDone finished:%d\n", config.requests_finished);
+    //sleep(10);
     if (config.requests_finished == config.requests) {
         freeClient(c);
         aeStop(config.el);
@@ -196,7 +201,7 @@ static void readHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(fd);
     UNUSED(mask);
 
-    /* Calculate latency only for the first read event. This means that the
+     /* Calculate latency only for the first read event. This means that the
      * server already sent the reply and we need to parse it. Parsing overhead
      * is not part of the latency, so calculate it only once, here. */
     if (c->latency < 0) c->latency = ustime()-(c->start);
@@ -247,6 +252,7 @@ static void readHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
                 if (config.requests_finished < config.requests)
                     config.latency[config.requests_finished++] = c->latency;
                 c->pending--;
+                //printf("@@@@@ pending:%d\n", c->pending);
                 if (c->pending == 0) {
                     clientDone(c);
                     break;
@@ -264,12 +270,13 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(fd);
     UNUSED(mask);
 
-    if(HIREDIS_ZEUS_DEBUG) printf("redis-benchmark.c/writeHandler\n");
+    printf("redis-benchmark.c/writeHandler\n");
 
     /* Initialize request when nothing was written. */
     if (c->written == 0) {
         /* Enforce upper bound to number of requests. */
         if (config.requests_issued++ >= config.requests) {
+            printf("will freeClient issued>=request\n");
             freeClient(c);
             return;
         }
@@ -279,6 +286,7 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
         c->start = ustime();
         c->latency = -1;
     }
+    printf("check c->obuf%d c->written:%d\n", sdslen(c->obuf), c->written);
     if (sdslen(c->obuf) > c->written) {
         void *ptr = c->obuf+c->written;
         // ZEUS
@@ -295,9 +303,12 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
             // push success
             nwritten = sga.bufs[0].len;
             printf("nwritten set to:%d\n", nwritten);
+            //sleep(5);
         }else{
             nwritten = -1;
             errno = EAGAIN;
+            printf("PUSH return qtoken\n");
+            sleep(100);
         }
         if (nwritten == -1) {
             if (errno != EPIPE)
@@ -494,7 +505,6 @@ static void benchmark(char *title, char *cmd, int len) {
 
     config.start = mstime();
     aeMain(config.el);
-    //sleep(10000);
     config.totlatency = mstime()-config.start;
 
     showLatencyReport();

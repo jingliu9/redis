@@ -173,12 +173,12 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
     if (mask & AE_READABLE) fe->rfileProc = proc;
     if (mask & AE_WRITABLE) fe->wfileProc = proc;
     /* _JL_  record read and write events */
-    if (mask & AE_READABLE) {
+    if ((mask & AE_READABLE) && (eventLoop->read_fds)[fd] < 0) {
         printf("ae.c/aeCreateFileEvent AE_READABLE\n");
         eventLoop->read_fd_sum ++;
         (eventLoop->read_fds)[fd] = fd;
     }
-    if (mask & AE_WRITABLE) {
+    if ((mask & AE_WRITABLE) && (eventLoop->write_fds)[fd] < 0) {
         printf("ae.c/aeCreateFileEvent AE_WRITABLE\n");
         eventLoop->write_fd_sum ++;
         (eventLoop->write_fds)[fd] = fd;
@@ -462,7 +462,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         if(numevents < 0){
             fprintf(stderr, "numevents error: %d\n", numevents);
         }
-        //printf("@@@@@@numevents:%d\n", numevents);
+        //printf("@@@@@@numevents:%d listen_fd_sum:%d read_fd_sum:%d write_fd_sum:%d\n", numevents, eventLoop->listen_fd_sum, eventLoop->read_fd_sum, eventLoop->write_fd_sum);
 
         /* _JL_ loop to process READABLE events (accept() and read()) */
         // simply add all the events to fired list, assume check returned err and errno to avoid exiting
@@ -471,24 +471,28 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         for(ii = 0; ii < eventLoop->setsize; ii++){
             if (eventLoop->listen_fds[ii] > 0){
                 int qd = eventLoop->listen_fds[ii];
+                //printf("listen_fds[%d] is %d, jj:%d\n", ii, eventLoop->listen_fds[ii], jj);
                 eventLoop->fired[jj].fd = qd;
                 eventLoop->fired[jj].mask = AE_READABLE;
                 jj++;
             }
             if (eventLoop->read_fds[ii] > 0){
+                //printf("read_fds[%d] is %d, jj:%d\n", ii, eventLoop->read_fds[ii], jj);
                 int qd = eventLoop->read_fds[ii];
                 eventLoop->fired[jj].fd = qd;
                 eventLoop->fired[jj].mask = AE_READABLE;
                 jj++;
             }
             if (eventLoop->write_fds[ii] > 0){
-                printf("write_fds[%d] is %d, jj:%d\n", ii, eventLoop->write_fds[ii], jj);
+                //printf("write_fds[%d] is %d, jj:%d\n", ii, eventLoop->write_fds[ii], jj);
                 int qd = eventLoop->write_fds[ii];
                 eventLoop->fired[jj].fd = qd;
                 eventLoop->fired[jj].mask = AE_WRITABLE;
                 jj++;
             }
         }
+        //printf("nevents:%d jj_sum:%d\n", numevents, jj);
+        numevents = jj;
 
         /**
         for(ii = 0; ii < eventLoop->listen_fd_sum; ii++){
