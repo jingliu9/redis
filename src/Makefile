@@ -14,7 +14,9 @@
 #
 ifndef ZEUS_SRC_DIR
 	#ZEUS_SRC_DIR=${HOME}/datacenter-OS/
+<<<<<<< Updated upstream
 	ZEUS_SRC_DIR = ${HOME}/datacenter-OS/
+>>>>>>> Stashed changes
 endif
 
 release_hdr := $(shell sh -c './mkreleasehdr.sh')
