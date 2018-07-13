@@ -76,6 +76,20 @@ aeEventLoop *aeCreateEventLoop(int setsize) {
     eventLoop->maxfd = -1;
     eventLoop->beforesleep = NULL;
     eventLoop->aftersleep = NULL;
+
+    /* _JL_ init fds in EventLoop */
+    eventLoop->read_fds = zmalloc(sizeof(int)*setsize);
+    eventLoop->read_fd_sum = 0;
+    eventLoop->listen_fds = zmalloc(sizeof(int)*setsize);
+    eventLoop->listen_fd_sum = 0;
+    eventLoop->write_fds = zmalloc(sizeof(int)*setsize);
+    eventLoop->write_fd_sum = 0;
+    for(i = 0; i < setsize; i++) {
+        eventLoop->read_fds[i] = -1;
+        eventLoop->listen_fds[i] = -1;
+        eventLoop->write_fds[i] = -1;
+    }
+
     if (aeApiCreate(eventLoop) == -1) goto err;
     /* Events with mask == AE_NONE are not set. So let's initialize the
      * vector with it. */
@@ -115,10 +129,20 @@ int aeResizeSetSize(aeEventLoop *eventLoop, int setsize) {
     eventLoop->fired = zrealloc(eventLoop->fired,sizeof(aeFiredEvent)*setsize);
     eventLoop->setsize = setsize;
 
+    /* _JL_ re-init in re-size */
+    eventLoop->listen_fds = zrealloc(eventLoop->listen_fds, sizeof(int)*setsize);
+    eventLoop->read_fds = zrealloc(eventLoop->read_fds, sizeof(int)*setsize);
+    eventLoop->write_fds = zrealloc(eventLoop->read_fds, sizeof(int)*setsize);
+
     /* Make sure that if we created new slots, they are initialized with
      * an AE_NONE mask. */
-    for (i = eventLoop->maxfd+1; i < setsize; i++)
+    for (i = eventLoop->maxfd+1; i < setsize; i++) {
         eventLoop->events[i].mask = AE_NONE;
+        /*******/
+        eventLoop->read_fds[i] = -1;
+        eventLoop->listen_fds[i] = -1;
+        /*******/
+    }
     return AE_OK;
 }
 
@@ -136,6 +160,7 @@ void aeStop(aeEventLoop *eventLoop) {
 int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
         aeFileProc *proc, void *clientData)
 {
+    printf("ae.c/aeCreateFileEvent@@@@@@ fd:%d\n", fd);
     if (fd >= eventLoop->setsize) {
         errno = ERANGE;
         return AE_ERR;
@@ -147,6 +172,17 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
     fe->mask |= mask;
     if (mask & AE_READABLE) fe->rfileProc = proc;
     if (mask & AE_WRITABLE) fe->wfileProc = proc;
+    /* _JL_  record read and write events */
+    if ((mask & AE_READABLE) && (eventLoop->read_fds)[fd] < 0) {
+        printf("ae.c/aeCreateFileEvent AE_READABLE\n");
+        eventLoop->read_fd_sum ++;
+        (eventLoop->read_fds)[fd] = fd;
+    }
+    if ((mask & AE_WRITABLE) && (eventLoop->write_fds)[fd] < 0) {
+        printf("ae.c/aeCreateFileEvent AE_WRITABLE\n");
+        eventLoop->write_fd_sum ++;
+        (eventLoop->write_fds)[fd] = fd;
+    }
     fe->clientData = clientData;
     if (fd > eventLoop->maxfd)
         eventLoop->maxfd = fd;
@@ -155,6 +191,7 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
 
 void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
 {
+    printf("ae.c/aeDeleteEvent @@@@@@fd:%d\n", fd);
     if (fd >= eventLoop->setsize) return;
     aeFileEvent *fe = &eventLoop->events[fd];
     if (fe->mask == AE_NONE) return;
@@ -162,6 +199,20 @@ void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
     /* We want to always remove AE_BARRIER if set when AE_WRITABLE
      * is removed. */
     if (mask & AE_WRITABLE) mask |= AE_BARRIER;
+
+    /* _JL_ */
+    if (mask & AE_READABLE) {
+        if(eventLoop->read_fds[fd] > 0){
+            eventLoop->read_fd_sum--;
+            (eventLoop->read_fds)[fd] = -1;
+        }
+    }
+    if (mask & AE_WRITABLE) {
+        if(eventLoop->write_fds[fd] > 0){
+            eventLoop->write_fd_sum--;
+            (eventLoop->write_fds)[fd] = -1;
+        }
+    }
 
     aeApiDelEvent(eventLoop, fd, mask);
     fe->mask = fe->mask & (~mask);
@@ -355,6 +406,7 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
 int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 {
     int processed = 0, numevents;
+    //printf("ae.c/aeProcessEvents @@@@@@\n");
 
     /* Nothing to do? return ASAP */
     if (!(flags & AE_TIME_EVENTS) && !(flags & AE_FILE_EVENTS)) return 0;
@@ -405,7 +457,57 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 
         /* Call the multiplexing API, will return only on timeout or when
          * some event fires. */
-        numevents = aeApiPoll(eventLoop, tvp);
+        //numevents = aeApiPoll(eventLoop, tvp);
+        numevents = eventLoop->listen_fd_sum + eventLoop->read_fd_sum + eventLoop->write_fd_sum;
+        if(numevents < 0){
+            fprintf(stderr, "numevents error: %d\n", numevents);
+        }
+        //printf("@@@@@@numevents:%d listen_fd_sum:%d read_fd_sum:%d write_fd_sum:%d\n", numevents, eventLoop->listen_fd_sum, eventLoop->read_fd_sum, eventLoop->write_fd_sum);
+
+        /* _JL_ loop to process READABLE events (accept() and read()) */
+        // simply add all the events to fired list, assume check returned err and errno to avoid exiting
+        int ii, jj;
+        jj = 0;
+        for(ii = 0; ii < eventLoop->setsize; ii++){
+            if (eventLoop->listen_fds[ii] > 0){
+                int qd = eventLoop->listen_fds[ii];
+                //printf("listen_fds[%d] is %d, jj:%d\n", ii, eventLoop->listen_fds[ii], jj);
+                eventLoop->fired[jj].fd = qd;
+                eventLoop->fired[jj].mask = AE_READABLE;
+                jj++;
+            }
+            if (eventLoop->read_fds[ii] > 0){
+                //printf("read_fds[%d] is %d, jj:%d\n", ii, eventLoop->read_fds[ii], jj);
+                int qd = eventLoop->read_fds[ii];
+                eventLoop->fired[jj].fd = qd;
+                eventLoop->fired[jj].mask = AE_READABLE;
+                jj++;
+            }
+            if (eventLoop->write_fds[ii] > 0){
+                //printf("write_fds[%d] is %d, jj:%d\n", ii, eventLoop->write_fds[ii], jj);
+                int qd = eventLoop->write_fds[ii];
+                eventLoop->fired[jj].fd = qd;
+                eventLoop->fired[jj].mask = AE_WRITABLE;
+                jj++;
+            }
+        }
+        //printf("nevents:%d jj_sum:%d\n", numevents, jj);
+        numevents = jj;
+
+        /**
+        for(ii = 0; ii < eventLoop->listen_fd_sum; ii++){
+            int qd = eventLoop->listen_fds[ii];
+            eventLoop->fired[jj].fd = qd;
+            eventLoop->fired[jj].mask = AE_READABLE;
+            jj++;
+        }
+        for(ii = 0; ii < eventLoop->read_fd_sum; ii++){
+            int qd = eventLoop->read_fds[ii];
+            eventLoop->fired[jj].fd = qd;
+            eventLoop->fired[jj].mask = AE_READABLE;
+            jj++;
+        }**/
+        /********/
 
         /* After sleep callback. */
         if (eventLoop->aftersleep != NULL && flags & AE_CALL_AFTER_SLEEP)
@@ -430,7 +532,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
              * before replying to a client. */
             int invert = fe->mask & AE_BARRIER;
 
-	    /* Note the "fe->mask & mask & ..." code: maybe an already
+	        /* Note the "fe->mask & mask & ..." code: maybe an already
              * processed event removed an element that fired and we still
              * didn't processed, so we check if the event is still valid.
              *

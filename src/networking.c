@@ -69,6 +69,7 @@ int listMatchObjects(void *a, void *b) {
 
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
+    printf("createClient fd:%d\n", fd);
 
     /* passing -1 as fd it is possible to create a non connected client.
      * This is useful since all the commands needs to be executed
@@ -310,7 +311,9 @@ void _addReplyStringToList(client *c, const char *s, size_t len) {
  * -------------------------------------------------------------------------- */
 
 void addReply(client *c, robj *obj) {
+    printf("addReply list_len:%d\n", listLength(server.clients_pending_write));
     if (prepareClientToWrite(c) != C_OK) return;
+    printf("addReply, has prepare client to write, list_len:%d\n", listLength(server.clients_pending_write));
 
     /* This is an important place where we can avoid copy-on-write
      * when there is a saving child running, avoiding touching the
@@ -611,6 +614,7 @@ int clientHasPendingReplies(client *c) {
 #define MAX_ACCEPTS_PER_CALL 1000
 static void acceptCommonHandler(int fd, int flags, char *ip) {
     client *c;
+    printf("acceptCommonHandler fd %d\n", fd);
     if ((c = createClient(fd)) == NULL) {
         serverLog(LL_WARNING,
             "Error registering fd event for the new client: %s (fd=%d)",
@@ -685,9 +689,11 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
     UNUSED(privdata);
+    //printf("acceptTcpHandler @@@@@@ max:%d fd:%d\n", max, fd);
 
     while(max--) {
         cfd = anetTcpAccept(server.neterr, fd, cip, sizeof(cip), &cport);
+        //printf("acceptTcpHandler :%d\n", cfd);
         if (cfd == ANET_ERR) {
             if (errno != EWOULDBLOCK)
                 serverLog(LL_WARNING,
@@ -899,10 +905,11 @@ void freeClientsInAsyncFreeQueue(void) {
  * is still valid after the call, C_ERR if it was freed. */
 int writeToClient(int fd, client *c, int handler_installed) {
     ssize_t nwritten = 0, totwritten = 0;
+    ssize_t npush;
     size_t objlen;
     sds o;
 
-    if(REDIS_ZEUS_DEBUG) printf("networking.c/writeToClient\n");
+    printf("networking.c/writeToClient fd:%d\n", fd);
 
     while(clientHasPendingReplies(c)) {
         if (c->bufpos > 0) {
@@ -916,7 +923,16 @@ int writeToClient(int fd, client *c, int handler_installed) {
             sga.addr.sin_port = c->addr.sin_port;
             sga.addr.sin_addr.s_addr = c->addr.sin_addr.s_addr;
             nwritten = zeus_push(fd, &sga);
-
+            if(npush == 0){
+                // push success
+                nwritten = sga.bufs[0].len;
+                printf("zeus_push success in server\n");
+                //sleep(5);
+            }else{
+                // push return qtoken
+                nwritten = sga.bufs[0].len;
+            }
+            printf("after zeus_push npush:%d\n", npush);
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
             totwritten += nwritten;
@@ -938,6 +954,8 @@ int writeToClient(int fd, client *c, int handler_installed) {
 
             // ZEUS
             //nwritten = write(fd, o + c->sentlen, objlen - c->sentlen);
+            printf("NO call here\n");
+            exit(1);
             nwritten = write(fd, o + c->sentlen, objlen - c->sentlen);
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
@@ -971,6 +989,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
              zmalloc_used_memory() < server.maxmemory) &&
             !(c->flags & CLIENT_SLAVE)) break;
     }
+    printf("writeToClient, endofpush() nwritten:%d\n", nwritten);
     server.stat_net_output_bytes += totwritten;
     if (nwritten == -1) {
         if (errno == EAGAIN) {
@@ -1000,6 +1019,9 @@ int writeToClient(int fd, client *c, int handler_installed) {
         }
         c->inflight = 0;
     }
+    printf("return from writeToClient\n");
+    server.el->write_fds[fd] = -1;
+    server.el->write_fd_sum--;
     return C_OK;
 }
 
@@ -1007,6 +1029,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
 void sendReplyToClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
+    printf("sendReplyToClient\n");
     writeToClient(fd,privdata,1);
 }
 
@@ -1018,6 +1041,7 @@ int handleClientsWithPendingWrites(void) {
     listIter li;
     listNode *ln;
     int processed = listLength(server.clients_pending_write);
+    //printf("handleClientsWithPendingWrites processed %d\n", processed);
 
     listRewind(server.clients_pending_write,&li);
     while((ln = listNext(&li))) {
@@ -1330,6 +1354,7 @@ int processMultibulkBuffer(client *c) {
  * or because a client was blocked and later reactivated, so there could be
  * pending query buffer, already representing a full command, to process. */
 void processInputBuffer(client *c) {
+    printf("processInputBuffer\n");
     server.current_client = c;
     /* Keep processing while there is something in the input buffer */
     while(sdslen(c->querybuf)) {
@@ -1392,11 +1417,13 @@ void processInputBuffer(client *c) {
 
 void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     client *c = (client*) privdata;
-    int nread, readlen;
+    int nread, readlen, npop, nwait;
     size_t qblen;
     UNUSED(el);
     UNUSED(mask);
+    UNUSED(nwait);
 
+<<<<<<< HEAD
     if(c->inflight > 0) {
       return;
     } else {
@@ -1404,6 +1431,9 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     }
 
     if(REDIS_ZEUS_DEBUG) printf("networking.c/readQueryFromClient\n");
+=======
+    //if(REDIS_ZEUS_DEBUG) printf("networking.c/readQueryFromClient fd:%d\n", fd);
+>>>>>>> io-queue
 
     readlen = PROTO_IOBUF_LEN;
     /* If this is a multi bulk request, and we are processing a bulk reply
@@ -1423,20 +1453,53 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     qblen = sdslen(c->querybuf);
     if (c->querybuf_peak < qblen) c->querybuf_peak = qblen;
     c->querybuf = sdsMakeRoomFor(c->querybuf, readlen);
-    //printf("@@@@@@readQueryFromClient/read()\n");
+    //printf("netoworking.c@@@@@@readQueryFromClient/read(%d)\n", fd);
     //nread = read(fd, c->querybuf+qblen, readlen);
     zeus_sgarray sga;
+<<<<<<< HEAD
     nread = zeus_pop(fd, &sga);
     c->addr.sin_port = sga.addr.sin_port;
     c->addr.sin_addr.s_addr = sga.addr.sin_addr.s_addr;
     if(REDIS_ZEUS_DEBUG){
         //serverLog(LL_WARNING,"zeus_pop return %d sga.bufs[0].len:%ld\n", nread, sga.bufs[0].len);
+=======
+    /**
+    // Use zeus_pop
+    npop = zeus_pop(fd, &sga);
+    if (npop == 0){
+        nread = sga.bufs[0].len;
+        printf("@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
+        sleep(5);
+    }else{
+        nread = -1;
+        // nwait = zeus_wait(npop, &sga);
+        // nread = sga.bufs[0].len;
+        // printf("return value of nwait:%d nread:%d\n", nwait, nread);
     }
+    //printf("@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
+    **/
+
+    // use light_pop
+    npop = zeus_light_pop(fd, &sga);
+    if(npop <= 0){
+        // make sure handled as EAGAIN
+        nread = -1;
+        npop = 1;
+    }else{
+        nread = npop;
+        if(nread != sga.bufs[0].len){
+            printf("Error, nread:%d, len:%d\n", nread, sga.bufs[0].len);
+            exit(1);
+        }
+        npop = 0;
+>>>>>>> io-queue
+    }
+
     char *ptr = (char*)(sga.bufs[0].buf);
-    if(nread == C_ZEUS_IO_ERR_NO){
+    if (npop > 0 || npop == C_ZEUS_IO_ERR_NO) {
         // regard as EAGAIN
         return;
-    }else if(nread != -1 && nread != 0){
+    }else if(nread != -1 && nread != 0) {
         memcpy(c->querybuf+qblen, ptr, sga.bufs[0].len);
     }
     if (nread == -1) {
@@ -1483,6 +1546,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
      * the sub-slaves and to the replication backlog. */
     if (!(c->flags & CLIENT_MASTER)) {
         processInputBuffer(c);
+        printf("after process Input buffer\n");
     } else {
         size_t prev_offset = c->reploff;
         processInputBuffer(c);
@@ -2076,6 +2140,7 @@ int clientsArePaused(void) {
 int processEventsWhileBlocked(void) {
     int iterations = 4; /* See the function top-comment. */
     int count = 0;
+    printf("processEventsWhileBlocked\n");
     while (iterations--) {
         int events = 0;
         events += aeProcessEvents(server.el, AE_FILE_EVENTS|AE_DONT_WAIT);

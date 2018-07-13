@@ -278,6 +278,7 @@ static int anetTcpGenericConnect(char *err, char *addr, int port,
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
 
+    printf("_JL_ anetTcpGenericConnect()-1\n");
     if ((rv = getaddrinfo(addr,portstr,&hints,&servinfo)) != 0) {
         anetSetError(err, "%s", gai_strerror(rv));
         return ANET_ERR;
@@ -347,6 +348,7 @@ end:
     } else {
         return s;
     }
+    printf("_JL_ anetTcpGenericConnect()\n");
 }
 
 int anetTcpConnect(char *err, char *addr, int port)
@@ -563,6 +565,7 @@ int anetTcpAccept(char *err, int s, char *ip, size_t ip_len, int *port) {
     int fd;
     struct sockaddr_storage sa;
     socklen_t salen = sizeof(sa);
+    //printf("anet.c/anetTcpAccept @@@@@@ s:%d\n", s);
     if ((fd = anetGenericAccept(err,s,(struct sockaddr*)&sa,&salen)) == -1)
         return ANET_ERR;
 

@@ -1186,6 +1186,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
  * for ready file descriptors. */
 void beforeSleep(struct aeEventLoop *eventLoop) {
     UNUSED(eventLoop);
+    //printf("server.c/beforeSleep @@@@@@\n");
 
     /* Call the Redis Cluster before sleep function. Note that this function
      * may change the state of Redis Cluster (from ok to fail or vice versa),
@@ -1853,6 +1854,18 @@ void initServer(void) {
         listenToPort(server.port,server.ipfd,&server.ipfd_count) == C_ERR)
         exit(1);
 
+    /* _JL_ record the listening port */
+    int ii;
+    assert(server.el->listen_fd_sum == 0);
+    server.el->listen_fd_sum = server.ipfd_count;
+    for(ii = 0; ii < server.ipfd_count; ii++) {
+        server.el->listen_fds[server.ipfd[ii]] = server.ipfd[ii];
+        printf("server.c/initServer@@@@@@  listen_fds[%d] = %d\n", server.ipfd[ii], server.ipfd[ii]);
+        //server.el->listen_fds[ii] = server.ipfd[ii];
+        //printf("server.c/initServer@@@@@@  listen_fds[%d] = %d\n", ii, server.el->listen_fds[ii]);
+    }
+
+
     /* Open the listening Unix domain socket. */
     if (server.unixsocket != NULL) {
         unlink(server.unixsocket); /* don't care if this fails */
@@ -1924,6 +1937,7 @@ void initServer(void) {
 
     /* Create an event handler for accepting new connections in TCP and Unix
      * domain sockets. */
+    printf("server.c/initServer@@@@@@ ipfd_count:%d\n", server.ipfd_count);
     for (j = 0; j < server.ipfd_count; j++) {
         if (aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
             acceptTcpHandler,NULL) == AE_ERR)
@@ -2331,6 +2345,7 @@ void call(client *c, int flags) {
  * other operations can be performed by the caller. Otherwise
  * if C_ERR is returned the client was destroyed (i.e. after QUIT). */
 int processCommand(client *c) {
+    printf("processCommand\n");
     /* The QUIT command is handled separately. Normal command procs will
      * go through checking for replication and QUIT will cause trouble
      * when FORCE_REPLICATION is enabled and would be implemented in
