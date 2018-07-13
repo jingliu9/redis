@@ -922,7 +922,9 @@ int writeToClient(int fd, client *c, int handler_installed) {
             sga.bufs[0].len = c->bufpos-c->sentlen;
             sga.addr.sin_port = c->addr.sin_port;
             sga.addr.sin_addr.s_addr = c->addr.sin_addr.s_addr;
-            nwritten = zeus_push(fd, &sga);
+            printf("before zeus_push\n");
+            //nwritten = zeus_push(fd, &sga);
+            npush = zeus_push(fd, &sga);
             if(npush == 0){
                 // push success
                 nwritten = sga.bufs[0].len;
@@ -933,6 +935,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
                 nwritten = sga.bufs[0].len;
             }
             printf("after zeus_push npush:%d\n", npush);
+
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
             totwritten += nwritten;
@@ -1423,7 +1426,6 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(mask);
     UNUSED(nwait);
 
-<<<<<<< HEAD
     if(c->inflight > 0) {
       return;
     } else {
@@ -1431,9 +1433,6 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     }
 
     if(REDIS_ZEUS_DEBUG) printf("networking.c/readQueryFromClient\n");
-=======
-    //if(REDIS_ZEUS_DEBUG) printf("networking.c/readQueryFromClient fd:%d\n", fd);
->>>>>>> io-queue
 
     readlen = PROTO_IOBUF_LEN;
     /* If this is a multi bulk request, and we are processing a bulk reply
@@ -1456,13 +1455,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     //printf("netoworking.c@@@@@@readQueryFromClient/read(%d)\n", fd);
     //nread = read(fd, c->querybuf+qblen, readlen);
     zeus_sgarray sga;
-<<<<<<< HEAD
-    nread = zeus_pop(fd, &sga);
-    c->addr.sin_port = sga.addr.sin_port;
-    c->addr.sin_addr.s_addr = sga.addr.sin_addr.s_addr;
-    if(REDIS_ZEUS_DEBUG){
-        //serverLog(LL_WARNING,"zeus_pop return %d sga.bufs[0].len:%ld\n", nread, sga.bufs[0].len);
-=======
+
     /**
     // Use zeus_pop
     npop = zeus_pop(fd, &sga);
@@ -1481,6 +1474,8 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
 
     // use light_pop
     npop = zeus_light_pop(fd, &sga);
+    c->addr.sin_port = sga.addr.sin_port;
+    c->addr.sin_addr.s_addr = sga.addr.sin_addr.s_addr;
     if(npop <= 0){
         // make sure handled as EAGAIN
         nread = -1;
@@ -1492,7 +1487,6 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
             exit(1);
         }
         npop = 0;
->>>>>>> io-queue
     }
 
     char *ptr = (char*)(sga.bufs[0].buf);
