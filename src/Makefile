@@ -63,10 +63,36 @@ endif
 # Override default settings if possible
 -include .make-settings
 
+
+#####################################################################
+# mtcp settings
+#####################################################################
+# DPDK
+DPDK_HOME=/users/jingliu/datacenter-OS/libos/libmtcp/mtcp/dpdk/
+DPDK_INC=$(DPDK_HOME)/include
+DPDK_LIB=$(DPDK_HOME)/lib/
+DPDK_MACHINE_FLAGS = $(shell cat /users/jingliu/datacenter-OS/libos/libmtcp/mtcp/dpdk/include/cflags.txt)
+DPDK_LIB_FLAGS = $(shell cat /users/jingliu/datacenter-OS/libos/libmtcp/mtcp/dpdk/lib/ldflags.txt) -lgmp
+
+# MTCP
+MTCP_FLD    =/users/jingliu/datacenter-OS/libos/libmtcp/mtcp/mtcp/
+MTCP_INC    =-I$(MTCP_FLD)/include
+MTCP_LIB    =-L$(MTCP_FLD)/lib
+MTCP_TARGET = $(MTCP_LIB)/lib/libmtcp.a
+
 FINAL_CFLAGS=$(STD) $(WARN) $(OPT) $(DEBUG) $(CFLAGS) $(REDIS_CFLAGS)
 FINAL_LDFLAGS=$(LDFLAGS) $(REDIS_LDFLAGS) $(DEBUG)
 FINAL_LIBS=-lm
 DEBUG=-g -ggdb
+
+### add mtcp and dpdk flags
+FINAL_CFLAGS += $(MTCP_INC) $(DPDK_MACHINE_FLAGS) -I$(DPDK_INC) -include $(DPDK_INC)/rte_config.h
+#FINAL_LDFLAGS += 
+FINAL_LIBS += -pthread -lrt -march=native -export-dynamic $(MTCP_FLD)/lib/libmtcp.a $(MTCP_LIB) -L$(DPDK_HOME)/lib -lnuma -lmtcp -lpthread -lrt -ldl $(DPDK_LIB_FLAGS)
+
+$(info >>>>>>>>>>> $$FINAL_CFLAGS is [${FINAL_CFLAGS}])
+$(info >>>>>>>>>>> $$FINAL_LDFLAGS is [${FINAL_LDFLAGS}])
+$(info >>>>>>>>>>> $$FINAL_LIBSS is [${FINAL_LIBS}])
 
 ifeq ($(uname_S),SunOS)
 	# SunOS
