@@ -1722,6 +1722,7 @@ int listenToPort(int port, int *fds, int *count) {
     if (server.bindaddr_count == 0) server.bindaddr[0] = NULL;
     for (j = 0; j < server.bindaddr_count || j == 0; j++) {
         if (server.bindaddr[j] == NULL) {
+            printf("_JL_@@@ server.bindaddr[%d] == null\n", j);
             int unsupported = 0;
             /* Bind * for both IPv6 and IPv4, we enter here only if
              * server.bindaddr_count == 0. */
@@ -1752,10 +1753,12 @@ int listenToPort(int port, int *fds, int *count) {
              * error and return to the caller with an error. */
             if (*count + unsupported == 2) break;
         } else if (strchr(server.bindaddr[j],':')) {
+            printf("server.bindaddr[%d] is ipv6\n", j);
             /* Bind IPv6 address. */
             fds[*count] = anetTcp6Server(server.neterr,port,server.bindaddr[j],
                 server.tcp_backlog);
         } else {
+            printf("server.bindaddr[%d] is ipv4\n", j);
             /* Bind IPv4 address. */
             fds[*count] = anetTcpServer(server.neterr,port,server.bindaddr[j],
                 server.tcp_backlog);

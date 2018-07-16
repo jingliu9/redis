@@ -68,6 +68,7 @@ int listMatchObjects(void *a, void *b) {
 }
 
 client *createClient(int fd) {
+    printf("_JL_@@@networking.c/createClient fd:%d\n", fd);
     client *c = zmalloc(sizeof(client));
 
     /* passing -1 as fd it is possible to create a non connected client.

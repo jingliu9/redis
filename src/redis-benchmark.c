@@ -315,6 +315,7 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
  * Even when cloning another client, prefix commands are applied if needed.*/
 static client createClient(char *cmd, size_t len, client from) {
     int j;
+    printf("_JL_@@@ createClient.c/creatClient()\n");
     client c = zmalloc(sizeof(struct _client));
 
     if (config.hostsocket == NULL) {
