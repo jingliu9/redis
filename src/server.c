@@ -1219,7 +1219,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
 
     /* Check if there are clients unblocked by modules that implement
      * blocking commands. */
-    moduleHandleBlockedClients();
+    //moduleHandleBlockedClients();
 
     /* Try to process pending commands for clients that were just unblocked. */
     if (listLength(server.unblocked_clients))
