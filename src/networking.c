@@ -69,7 +69,7 @@ int listMatchObjects(void *a, void *b) {
 
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
-    printf("createClient fd:%d\n", fd);
+    //printf("createClient fd:%d\n", fd);
 
     /* passing -1 as fd it is possible to create a non connected client.
      * This is useful since all the commands needs to be executed
@@ -614,7 +614,7 @@ int clientHasPendingReplies(client *c) {
 #define MAX_ACCEPTS_PER_CALL 1000
 static void acceptCommonHandler(int fd, int flags, char *ip) {
     client *c;
-    printf("acceptCommonHandler fd %d\n", fd);
+    //printf("acceptCommonHandler fd %d\n", fd);
     if ((c = createClient(fd)) == NULL) {
         serverLog(LL_WARNING,
             "Error registering fd event for the new client: %s (fd=%d)",
@@ -1473,7 +1473,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     **/
 
     // use light_pop
-    npop = zeus_light_pop(fd, &sga);
+    npop = zeus_peek(fd, &sga);
     c->addr.sin_port = sga.addr.sin_port;
     c->addr.sin_addr.s_addr = sga.addr.sin_addr.s_addr;
     if(npop <= 0){

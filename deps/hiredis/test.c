@@ -759,6 +759,23 @@ int main(int argc, char **argv) {
     int throughput = 1;
     int test_inherit_fd = 1;
 
+    char* udp_argv[] = {(char*)"",
+            			(char*)"-b",
+						(char*)"0000:03:00.0",
+						(char*)"-l",
+						(char*)"1",
+						(char*)"-m",
+						(char*)"256",
+						(char*)"--no-shconf",
+						(char*)"--file-prefix",
+						(char*)"c" };
+    int udp_argc = 10;
+
+    if (zeus_init(udp_argc, udp_argv) < 0) {
+    	printf("Error initializing Zeus!\n");
+    	return -1;
+    }
+
     /* Ignore broken pipe signal (for I/O error tests). */
     signal(SIGPIPE, SIG_IGN);
 

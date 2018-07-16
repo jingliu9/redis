@@ -239,10 +239,10 @@ static int anetSetReuseAddr(char *err, int fd) {
     int yes = 1;
     /* Make sure connection-intensive things like the redis benckmark
      * will be able to close/open sockets a zillion of times */
-    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
-        anetSetError(err, "setsockopt SO_REUSEADDR: %s", strerror(errno));
-        return ANET_ERR;
-    }
+//    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
+//        anetSetError(err, "setsockopt SO_REUSEADDR: %s", strerror(errno));
+//        return ANET_ERR;
+//    }
     return ANET_OK;
 }
 
@@ -447,6 +447,7 @@ int anetWrite(int fd, char *buf, int count)
 static int anetListen(char *err, int s, struct sockaddr *sa, socklen_t len, int backlog) {
     //if (bind(s,sa,len) == -1) {
     if (zeus_bind(s,sa,len) == -1) {
+    	perror("anetListen zeus_bind");
         anetSetError(err, "bind: %s", strerror(errno));
         close(s);
         return ANET_ERR;
@@ -466,6 +467,7 @@ static int anetListen(char *err, int s, struct sockaddr *sa, socklen_t len, int 
 static int anetV6Only(char *err, int s) {
     int yes = 1;
     if (setsockopt(s,IPPROTO_IPV6,IPV6_V6ONLY,&yes,sizeof(yes)) == -1) {
+    	perror("setsockopt");
         anetSetError(err, "setsockopt: %s", strerror(errno));
         close(s);
         return ANET_ERR;
@@ -491,24 +493,39 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
         //if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
-        if ((s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
-            continue;
+        if ((s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1) {
+            perror("zeus_queue returned -1");
+        	continue;
+        }
 
-        if (af == AF_INET6 && anetV6Only(err,s) == ANET_ERR) goto error;
-        if (anetSetReuseAddr(err,s) == ANET_ERR) goto error;
-        if (anetListen(err,s,p->ai_addr,p->ai_addrlen,backlog) == ANET_ERR) s = ANET_ERR;
+        if (af == AF_INET6 && anetV6Only(err,s) == ANET_ERR) {
+        	perror("af_inet6 branch");
+        	goto error;
+        }
+        if (anetSetReuseAddr(err,s) == ANET_ERR) {
+        	perror("anetSetReuseAddr");
+        	goto error;
+        }
+        if (anetListen(err,s,p->ai_addr,p->ai_addrlen,backlog) == ANET_ERR) {
+        	s = ANET_ERR;
+        	perror("error anetListen");
+        }
+        perror("goto end");
         goto end;
     }
     if (p == NULL) {
+    	perror("unable to bind socket:");
         anetSetError(err, "unable to bind socket, errno: %d", errno);
         goto error;
     }
 
 error:
     if (s != -1) close(s);
+    perror("whoopsie");
     s = ANET_ERR;
 end:
     freeaddrinfo(servinfo);
+    perror("returning from _anetTcpServer");
     return s;
 }
 
@@ -519,7 +536,7 @@ int anetTcpServer(char *err, int port, char *bindaddr, int backlog)
 
 int anetTcp6Server(char *err, int port, char *bindaddr, int backlog)
 {
-    return _anetTcpServer(err, port, bindaddr, AF_INET6, backlog);
+    return _anetTcpServer(err, port, bindaddr, AF_INET, backlog);
 }
 
 int anetUnixServer(char *err, char *path, mode_t perm, int backlog)

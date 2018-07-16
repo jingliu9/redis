@@ -823,7 +823,7 @@ int redisBufferRead(redisContext *c) {
     }**/
 
     // use zeus_light_pop
-    npop = zeus_light_pop(c->fd, &sga);
+    npop = zeus_peek(c->fd, &sga);
     if(npop <= 0){
         // make sure handled as EAGAIN
         nread = -1;
@@ -848,7 +848,10 @@ int redisBufferRead(redisContext *c) {
     if (nread == -1) {
         if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
+        } else if (errno == 0) {
+        	return REDIS_OK;
         } else {
+        	printf("redisBufferRead error: %d\n", errno);
             __redisSetError(c,REDIS_ERR_IO,NULL);
             return REDIS_ERR;
         }

@@ -347,10 +347,11 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
 static client createClient(char *cmd, size_t len, client from) {
     int j;
     client c = zmalloc(sizeof(struct _client));
-    printf("redis-benchmar.c@@@@@@createClient\n");
+    //printf("redis-benchmar.c@@@@@@createClient\n");
 
     if (config.hostsocket == NULL) {
         c->context = redisConnectNonBlock(config.hostip,config.hostport);
+        printf("hostip: %s, hostport: %d\n", config.hostip, config.hostport);
     } else {
         c->context = redisConnectUnixNonBlock(config.hostsocket);
     }
@@ -685,6 +686,25 @@ int main(int argc, const char **argv) {
     int len;
 
     client c;
+
+    char* udp_argv[] = {(char*)"",
+            			(char*)"-b",
+						(char*)"0000:03:00.0",
+						(char*)"-l",
+						(char*)"1",
+						(char*)"-m",
+						(char*)"256",
+						(char*)"--no-shconf",
+						(char*)"--file-prefix",
+						(char*)"c" };
+    int udp_argc = 10;
+
+    if (zeus_init(udp_argc, udp_argv) < 0) {
+    	printf("Error initializing Zeus!\n");
+    	return -1;
+    }
+
+    printf("initialized zeus\n");
 
     srandom(time(NULL));
     signal(SIGHUP, SIG_IGN);

@@ -160,7 +160,7 @@ void aeStop(aeEventLoop *eventLoop) {
 int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
         aeFileProc *proc, void *clientData)
 {
-    printf("ae.c/aeCreateFileEvent@@@@@@ fd:%d\n", fd);
+    //printf("ae.c/aeCreateFileEvent@@@@@@ fd:%d\n", fd);
     if (fd >= eventLoop->setsize) {
         errno = ERANGE;
         return AE_ERR;
@@ -174,12 +174,12 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
     if (mask & AE_WRITABLE) fe->wfileProc = proc;
     /* _JL_  record read and write events */
     if ((mask & AE_READABLE) && (eventLoop->read_fds)[fd] < 0) {
-        printf("ae.c/aeCreateFileEvent AE_READABLE\n");
+        //printf("ae.c/aeCreateFileEvent AE_READABLE\n");
         eventLoop->read_fd_sum ++;
         (eventLoop->read_fds)[fd] = fd;
     }
     if ((mask & AE_WRITABLE) && (eventLoop->write_fds)[fd] < 0) {
-        printf("ae.c/aeCreateFileEvent AE_WRITABLE\n");
+        //printf("ae.c/aeCreateFileEvent AE_WRITABLE\n");
         eventLoop->write_fd_sum ++;
         (eventLoop->write_fds)[fd] = fd;
     }
