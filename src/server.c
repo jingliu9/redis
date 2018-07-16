@@ -1862,6 +1862,8 @@ void initServer(void) {
             exit(1);
         }
         anetNonBlock(NULL,server.sofd);
+    }else{
+        printf("_JL_@@@ server.unixsocket is null\n");
     }
 
     /* Abort if there are no listening sockets at all. */

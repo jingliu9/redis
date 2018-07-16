@@ -339,6 +339,7 @@ void sdsIncrLen(sds s, ssize_t incr) {
         }
         case SDS_TYPE_16: {
             SDS_HDR_VAR(16,s);
+            printf("incr:%d, sh->alloc->sh-len:%d sh->alloc:%d sh->len:%d\n", incr, sh->alloc-sh->len, sh->alloc, sh->len);
             assert((incr >= 0 && sh->alloc-sh->len >= incr) || (incr < 0 && sh->len >= (unsigned int)(-incr)));
             len = (sh->len += incr);
             break;

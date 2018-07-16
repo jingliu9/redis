@@ -60,6 +60,7 @@ static void anetSetError(char *err, const char *fmt, ...)
 
 int anetSetBlock(char *err, int fd, int non_block) {
     int flags;
+    printf("_JL_@@@ anetSetBlock fd:%d\n", fd);
 
     /* Set the socket blocking (if non_block is zero) or non-blocking.
      * Note that fcntl(2) for F_GETFL and F_SETFL can't be
@@ -467,6 +468,8 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
     int s = -1, rv;
     char _port[6];  /* strlen("65535") */
     struct addrinfo hints, *servinfo, *p;
+
+    printf("_JL_@@@ _anetTcpServer\n");
 
     snprintf(_port,6,"%d",port);
     memset(&hints,0,sizeof(hints));
