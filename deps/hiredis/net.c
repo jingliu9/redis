@@ -130,6 +130,7 @@ static int redisSetBlocking(redisContext *c, int blocking) {
 int redisKeepAlive(redisContext *c, int interval) {
     int val = 1;
     int fd = c->fd;
+#if 0
 
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1){
         __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
@@ -165,17 +166,20 @@ int redisKeepAlive(redisContext *c, int interval) {
     }
 #endif
 #endif
+#endif 
 
     return REDIS_OK;
 }
 
 static int redisSetTcpNoDelay(redisContext *c) {
     int yes = 1;
+#if 0
     if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(TCP_NODELAY)");
         redisContextCloseFd(c);
         return REDIS_ERR;
     }
+#endif
     return REDIS_OK;
 }
 

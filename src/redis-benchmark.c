@@ -298,17 +298,22 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
         sga.bufs[0].len = sdslen(c->obuf)-c->written;
         ssize_t nwritten, npush; 
         npush = zeus_push(c->context->fd, &sga);
-        printf("return value of zeus_push() %zd\n", nwritten);
+        printf("return value of zeus_push() %zd\n", npush);
         if(npush == 0){
             // push success
             nwritten = sga.bufs[0].len;
             printf("nwritten set to:%d\n", nwritten);
-            //sleep(5);
+        }else if(npush > 0){
+            // zeus_push returns qtoken
+            nwritten = -1;
+            errno = EAGAIN;
+            printf("_JL_@@@ redis-benchmark.c/writeHandler PUSH return qtoken will wait\n");
+            zeus_sgarray tmp_sga;
+            zeus_wait(npush, &tmp_sga);
+            //sleep(100);
         }else{
             nwritten = -1;
             errno = EAGAIN;
-            printf("PUSH return qtoken\n");
-            sleep(100);
         }
         if (nwritten == -1) {
             if (errno != EPIPE)
