@@ -143,11 +143,13 @@ int anetKeepAlive(char *err, int fd, int interval)
 
 static int anetSetTcpNoDelay(char *err, int fd, int val)
 {
+#if 0
     if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val)) == -1)
     {
         anetSetError(err, "setsockopt TCP_NODELAY: %s", strerror(errno));
         return ANET_ERR;
     }
+#endif
     return ANET_OK;
 }
 
