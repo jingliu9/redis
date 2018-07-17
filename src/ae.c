@@ -191,7 +191,7 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
 
 void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
 {
-    printf("ae.c/aeDeleteEvent @@@@@@fd:%d\n", fd);
+    // printf("ae.c/aeDeleteEvent @@@@@@fd:%d\n", fd);
     if (fd >= eventLoop->setsize) return;
     aeFileEvent *fe = &eventLoop->events[fd];
     if (fe->mask == AE_NONE) return;
@@ -460,7 +460,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         //numevents = aeApiPoll(eventLoop, tvp);
         numevents = eventLoop->listen_fd_sum + eventLoop->read_fd_sum + eventLoop->write_fd_sum;
         if(numevents < 0){
-            fprintf(stderr, "numevents error: %d\n", numevents);
+            // fprintf(stderr, "numevents error: %d\n", numevents);
         }
         //printf("@@@@@@numevents:%d listen_fd_sum:%d read_fd_sum:%d write_fd_sum:%d\n", numevents, eventLoop->listen_fd_sum, eventLoop->read_fd_sum, eventLoop->write_fd_sum);
 

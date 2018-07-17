@@ -69,7 +69,8 @@ int listMatchObjects(void *a, void *b) {
 
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
-    //printf("createClient fd:%d\n", fd);
+
+    if(REDIS_ZEUS_DEBUG) printf("createClient fd:%d\n", fd);
 
     /* passing -1 as fd it is possible to create a non connected client.
      * This is useful since all the commands needs to be executed
@@ -311,9 +312,9 @@ void _addReplyStringToList(client *c, const char *s, size_t len) {
  * -------------------------------------------------------------------------- */
 
 void addReply(client *c, robj *obj) {
-    printf("addReply list_len:%d\n", listLength(server.clients_pending_write));
+    if(REDIS_ZEUS_DEBUG) printf("addReply list_len:%d\n", listLength(server.clients_pending_write));
     if (prepareClientToWrite(c) != C_OK) return;
-    printf("addReply, has prepare client to write, list_len:%d\n", listLength(server.clients_pending_write));
+    if(REDIS_ZEUS_DEBUG) printf("addReply, has prepare client to write, list_len:%d\n", listLength(server.clients_pending_write));
 
     /* This is an important place where we can avoid copy-on-write
      * when there is a saving child running, avoiding touching the
@@ -614,7 +615,8 @@ int clientHasPendingReplies(client *c) {
 #define MAX_ACCEPTS_PER_CALL 1000
 static void acceptCommonHandler(int fd, int flags, char *ip) {
     client *c;
-    //printf("acceptCommonHandler fd %d\n", fd);
+
+    if(REDIS_ZEUS_DEBUG) printf("acceptCommonHandler fd %d\n", fd);
     if ((c = createClient(fd)) == NULL) {
         serverLog(LL_WARNING,
             "Error registering fd event for the new client: %s (fd=%d)",
@@ -909,7 +911,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
     size_t objlen;
     sds o;
 
-    printf("networking.c/writeToClient fd:%d\n", fd);
+    if(REDIS_ZEUS_DEBUG) printf("networking.c/writeToClient fd:%d\n", fd);
 
     while(clientHasPendingReplies(c)) {
         if (c->bufpos > 0) {
@@ -922,19 +924,19 @@ int writeToClient(int fd, client *c, int handler_installed) {
             sga.bufs[0].len = c->bufpos-c->sentlen;
             sga.addr.sin_port = c->addr.sin_port;
             sga.addr.sin_addr.s_addr = c->addr.sin_addr.s_addr;
-            printf("before zeus_push\n");
+            if(REDIS_ZEUS_DEBUG) printf("before zeus_push\n");
             //nwritten = zeus_push(fd, &sga);
             npush = zeus_push(fd, &sga);
             if(npush == 0){
                 // push success
                 nwritten = sga.bufs[0].len;
-                printf("zeus_push success in server\n");
+                if(REDIS_ZEUS_DEBUG) printf("zeus_push success in server\n");
                 //sleep(5);
             }else{
                 // push return qtoken
                 nwritten = sga.bufs[0].len;
             }
-            printf("after zeus_push npush:%d\n", npush);
+            if(REDIS_ZEUS_DEBUG) printf("after zeus_push npush:%d\n", npush);
 
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
@@ -992,7 +994,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
              zmalloc_used_memory() < server.maxmemory) &&
             !(c->flags & CLIENT_SLAVE)) break;
     }
-    printf("writeToClient, endofpush() nwritten:%d\n", nwritten);
+    if(REDIS_ZEUS_DEBUG) printf("writeToClient, endofpush() nwritten:%d\n", nwritten);
     server.stat_net_output_bytes += totwritten;
     if (nwritten == -1) {
         if (errno == EAGAIN) {
@@ -1022,7 +1024,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
         }
         c->inflight = 0;
     }
-    printf("return from writeToClient\n");
+    if(REDIS_ZEUS_DEBUG) printf("return from writeToClient\n");
     server.el->write_fds[fd] = -1;
     server.el->write_fd_sum--;
     return C_OK;
@@ -1032,7 +1034,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
 void sendReplyToClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
-    printf("sendReplyToClient\n");
+    if(REDIS_ZEUS_DEBUG) printf("sendReplyToClient\n");
     writeToClient(fd,privdata,1);
 }
 
@@ -1357,7 +1359,7 @@ int processMultibulkBuffer(client *c) {
  * or because a client was blocked and later reactivated, so there could be
  * pending query buffer, already representing a full command, to process. */
 void processInputBuffer(client *c) {
-    printf("processInputBuffer\n");
+    if(REDIS_ZEUS_DEBUG) printf("processInputBuffer\n");
     server.current_client = c;
     /* Keep processing while there is something in the input buffer */
     while(sdslen(c->querybuf)) {
@@ -1541,7 +1543,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
      * the sub-slaves and to the replication backlog. */
     if (!(c->flags & CLIENT_MASTER)) {
         processInputBuffer(c);
-        printf("after process Input buffer\n");
+        if(REDIS_ZEUS_DEBUG) printf("after process Input buffer\n");
     } else {
         size_t prev_offset = c->reploff;
         processInputBuffer(c);

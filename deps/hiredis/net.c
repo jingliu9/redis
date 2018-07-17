@@ -130,6 +130,7 @@ static int redisSetBlocking(redisContext *c, int blocking) {
 int redisKeepAlive(redisContext *c, int interval) {
     int val = 1;
     int fd = c->fd;
+#if 0
 
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1){
         __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
@@ -165,6 +166,7 @@ int redisKeepAlive(redisContext *c, int interval) {
     }
 #endif
 #endif
+#endif 
 
     return REDIS_OK;
 }
