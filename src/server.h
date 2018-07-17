@@ -74,7 +74,7 @@ typedef long long mstime_t; /* millisecond time type. */
 #include "crc64.h"
 
 /* zeus debug, if 1, printf to debug*/
-#define REDIS_ZEUS_DEBUG 1
+#define REDIS_ZEUS_DEBUG 0
 
 /* Error codes */
 #define C_OK                    0

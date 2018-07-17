@@ -84,7 +84,7 @@ int anetSetBlock(char *err, int fd, int non_block) {
 }
 
 int anetNonBlock(char *err, int fd) {
-    printf("_JL_@@@anet.c/anetNonBlock: fd:%d\n", fd);
+    // printf("_JL_@@@anet.c/anetNonBlock: fd:%d\n", fd);
     return anetSetBlock(err,fd,1);
 }
 
@@ -242,7 +242,7 @@ int anetResolveIP(char *err, char *host, char *ipbuf, size_t ipbuf_len) {
 
 static int anetSetReuseAddr(char *err, int fd) {
     int yes = 1;
-    printf("_JL_@@@anet.c/anetSetReuseAddr fd:%d\n", fd);
+    // printf("_JL_@@@anet.c/anetSetReuseAddr fd:%d\n", fd);
     UNUSED(yes);
     UNUSED(fd);
     UNUSED(err);
@@ -289,7 +289,7 @@ static int anetTcpGenericConnect(char *err, char *addr, int port,
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-    printf("_JL_ anetTcpGenericConnect()-1\n");
+    // printf("_JL_ anetTcpGenericConnect()-1\n");
     if ((rv = getaddrinfo(addr,portstr,&hints,&servinfo)) != 0) {
         anetSetError(err, "%s", gai_strerror(rv));
         return ANET_ERR;
@@ -359,7 +359,7 @@ end:
     } else {
         return s;
     }
-    printf("_JL_ anetTcpGenericConnect()\n");
+    // printf("_JL_ anetTcpGenericConnect()\n");
 }
 
 int anetTcpConnect(char *err, char *addr, int port)
@@ -456,7 +456,7 @@ int anetWrite(int fd, char *buf, int count)
 }
 
 static int anetListen(char *err, int s, struct sockaddr *sa, socklen_t len, int backlog) {
-    printf("_JL_@@@anet.c anetListen\n");
+    // printf("_JL_@@@anet.c anetListen\n");
     //if (bind(s,sa,len) == -1) {
     if (zeus_bind(s,sa,len) == -1) {
         anetSetError(err, "bind: %s", strerror(errno));
@@ -506,7 +506,7 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
             continue;
         **/
         s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol);
-        printf("_JL_@@@anet.c/_anetTcpServer:zeus_queue return:%d\n", s);
+        // printf("_JL_@@@anet.c/_anetTcpServer:zeus_queue return:%d\n", s);
         if(s == -1){
             continue;
         }
