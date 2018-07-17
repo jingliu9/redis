@@ -1461,8 +1461,8 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     //printf("@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
     **/
 
-    // use light_pop
-    npop = zeus_light_pop(fd, &sga);
+    // use peek
+    npop = zeus_peek(fd, &sga);
     if(npop <= 0){
         // make sure handled as EAGAIN
         nread = -1;
