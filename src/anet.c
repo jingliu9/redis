@@ -48,6 +48,8 @@
 
 #include "anet.h"
 
+#define UNUSED(x) (void )(x)
+
 static void anetSetError(char *err, const char *fmt, ...)
 {
     va_list ap;
@@ -82,6 +84,7 @@ int anetSetBlock(char *err, int fd, int non_block) {
 }
 
 int anetNonBlock(char *err, int fd) {
+    printf("_JL_@@@anet.c/anetNonBlock: fd:%d\n", fd);
     return anetSetBlock(err,fd,1);
 }
 
@@ -237,12 +240,17 @@ int anetResolveIP(char *err, char *host, char *ipbuf, size_t ipbuf_len) {
 
 static int anetSetReuseAddr(char *err, int fd) {
     int yes = 1;
+    printf("_JL_@@@anet.c/anetSetReuseAddr fd:%d\n", fd);
+    UNUSED(yes);
+    UNUSED(fd);
+    UNUSED(err);
     /* Make sure connection-intensive things like the redis benckmark
      * will be able to close/open sockets a zillion of times */
+    /**
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
         anetSetError(err, "setsockopt SO_REUSEADDR: %s", strerror(errno));
         return ANET_ERR;
-    }
+    }**/
     return ANET_OK;
 }
 
@@ -262,6 +270,7 @@ static int anetCreateSocket(char *err, int domain) {
     }
     return s;
 }
+
 
 #define ANET_CONNECT_NONE 0
 #define ANET_CONNECT_NONBLOCK 1
@@ -445,6 +454,7 @@ int anetWrite(int fd, char *buf, int count)
 }
 
 static int anetListen(char *err, int s, struct sockaddr *sa, socklen_t len, int backlog) {
+    printf("_JL_@@@anet.c anetListen\n");
     //if (bind(s,sa,len) == -1) {
     if (zeus_bind(s,sa,len) == -1) {
         anetSetError(err, "bind: %s", strerror(errno));
@@ -489,12 +499,26 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
         //if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        /**
         if ((s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
             continue;
+        **/
+        s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol);
+        printf("_JL_@@@anet.c/_anetTcpServer:zeus_queue return:%d\n", s);
+        if(s == -1){
+            continue;
+        }
 
-        if (af == AF_INET6 && anetV6Only(err,s) == ANET_ERR) goto error;
-        if (anetSetReuseAddr(err,s) == ANET_ERR) goto error;
-        if (anetListen(err,s,p->ai_addr,p->ai_addrlen,backlog) == ANET_ERR) s = ANET_ERR;
+        if (af == AF_INET6 && anetV6Only(err,s) == ANET_ERR) {
+            printf("af == AF_INET6 and error\n");
+            goto error;
+        }
+        if (anetSetReuseAddr(err,s) == ANET_ERR) {
+            goto error;
+        }
+        if (anetListen(err,s,p->ai_addr,p->ai_addrlen,backlog) == ANET_ERR) {
+            s = ANET_ERR;
+        }
         goto end;
     }
     if (p == NULL) {
@@ -512,11 +536,14 @@ end:
 
 int anetTcpServer(char *err, int port, char *bindaddr, int backlog)
 {
+    printf("_JL_@@@ anetTcpServer\n");
     return _anetTcpServer(err, port, bindaddr, AF_INET, backlog);
 }
 
 int anetTcp6Server(char *err, int port, char *bindaddr, int backlog)
 {
+    printf("_JL_@@@ anetTcp6Server\n");
+    errno = EAFNOSUPPORT;
     return _anetTcpServer(err, port, bindaddr, AF_INET6, backlog);
 }
 
@@ -560,7 +587,7 @@ int anetTcpAccept(char *err, int s, char *ip, size_t ip_len, int *port) {
     int fd;
     struct sockaddr_storage sa;
     socklen_t salen = sizeof(sa);
-    //printf("anet.c/anetTcpAccept @@@@@@ s:%d\n", s);
+    //printf("_JL_@@@ anet.c/anetTcpAccept s:%d\n", s);
     if ((fd = anetGenericAccept(err,s,(struct sockaddr*)&sa,&salen)) == -1)
         return ANET_ERR;
 
