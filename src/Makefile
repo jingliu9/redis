@@ -70,7 +70,7 @@ endif
 -include .make-settings
 
 ZEUS_CFLAGS := -I$(ZEUS_SRC_DIR)
-ZEUS_LDFLAGS := -L$(ZEUS_SRC_DIR) -L$(ZEUS_SRC_DIR)/libos/libmtcp/mtcp/dpdk/lib -L$(ZEUS_SRC_DIR)/libos/libmtcp/mtcp/mtcp/lib -lzeus_mtcp -lmtcp
+ZEUS_LDFLAGS := -L$(ZEUS_SRC_DIR) -L$(ZEUS_SRC_DIR)/libos/libmtcp/mtcp/dpdk/lib -L$(ZEUS_SRC_DIR)/libos/libmtcp/mtcp/mtcp/lib  -lzeus_mtcp -lmtcp -lhoard -Wl,-rpath,$(ZEUS_SRC_DIR)
 
 DPDK_HOME=$(ZEUS_SRC_DIR)/libos/libmtcp/mtcp/dpdk/
 DPDK_INC=$(DPDK_HOME)/include
@@ -89,7 +89,7 @@ FINAL_LDFLAGS=$(LDFLAGS) $(REDIS_LDFLAGS) $(DEBUG)
 FINAL_LIBS=-lm
 DEBUG=-g -ggdb
 
-ZEUS_LIBS := -L../../../ -lzeus_mtcp
+ZEUS_LIBS := -L../../../ -lzeus_mtcp -lhoard -Wl,-rpath,$(ZEUS_SRC_DIR)
 FINAL_CFLAGS += $(ZEUS_CFLAGS)
 FINAL_CFLAGS += $(MTCP_INC) $(DPDK_MACHINE_FLAGS) -I$(DPDK_INC) -include $(DPDK_INC)/rte_config.h
 FINAL_LDFLAGS += $(ZEUS_LDFLAGS)
