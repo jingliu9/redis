@@ -822,8 +822,8 @@ int redisBufferRead(redisContext *c) {
         printf("return value of nwait:%d nread:%d\n", nwait, nread);
     }**/
 
-    // use zeus_light_pop
-    npop = zeus_light_pop(c->fd, &sga);
+    // use zeus_light_peek
+    npop = zeus_peek(c->fd, &sga);
     if(npop <= 0){
         // make sure handled as EAGAIN
         nread = -1;
