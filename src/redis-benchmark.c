@@ -52,6 +52,8 @@
 #define UNUSED(V) ((void) V)
 #define RANDPTR_INITIAL_SIZE 8
 
+#define _REDIS_BENCH_ZEUS_DEBUG_ 0
+
 static struct config {
     aeEventLoop *el;
     const char *hostip;
@@ -150,7 +152,7 @@ static void freeAllClients(void) {
 }
 
 static void resetClient(client c) {
-    printf("resetClient\n");
+    if(_REDIS_BENCH_ZEUS_DEBUG_) printf("redis-Benchmark.c/resetClient\n");
     aeDeleteFileEvent(config.el,c->context->fd,AE_WRITABLE);
     aeDeleteFileEvent(config.el,c->context->fd,AE_READABLE);
     //aeCreateFileEvent(config.el,c->context->fd,AE_WRITABLE,writeHandler,c);
@@ -177,9 +179,10 @@ static void randomizeClientKey(client c) {
 }
 
 static void clientDone(client c) {
-    printf("clientDone finished:%d\n", config.requests_finished);
+    //printf("clientDone finished:%d\n", config.requests_finished);
     //sleep(10);
     if (config.requests_finished == config.requests) {
+        printf("clientDone, finished:%d\n", config.requests);
         freeClient(c);
         aeStop(config.el);
         return;
@@ -270,7 +273,7 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(fd);
     UNUSED(mask);
 
-    printf("redis-benchmark.c/writeHandler\n");
+    if(_REDIS_BENCH_ZEUS_DEBUG_) printf("redis-benchmark.c/writeHandler\n");
 
     /* Initialize request when nothing was written. */
     if (c->written == 0) {
@@ -286,7 +289,7 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
         c->start = ustime();
         c->latency = -1;
     }
-    printf("check c->obuf%d c->written:%d\n", sdslen(c->obuf), c->written);
+    if(_REDIS_BENCH_ZEUS_DEBUG_) printf("check c->obuf:%d c->written:%d\n", sdslen(c->obuf), c->written);
     if (sdslen(c->obuf) > c->written) {
         void *ptr = c->obuf+c->written;
         // ZEUS
@@ -298,11 +301,11 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
         sga.bufs[0].len = sdslen(c->obuf)-c->written;
         ssize_t nwritten, npush; 
         npush = zeus_push(c->context->fd, &sga);
-        printf("return value of zeus_push() %zd\n", npush);
+        if(_REDIS_BENCH_ZEUS_DEBUG_) printf("return value of zeus_push() %zd\n", npush);
         if(npush == 0){
             // push success
             nwritten = sga.bufs[0].len;
-            printf("nwritten set to:%d\n", nwritten);
+            if(_REDIS_BENCH_ZEUS_DEBUG_) printf("nwritten set to:%d\n", nwritten);
         }else if(npush > 0){
             // zeus_push returns qtoken
             nwritten = -1;
