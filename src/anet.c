@@ -498,14 +498,14 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
         	continue;
         }
 
-        if (af == AF_INET6 && anetV6Only(err,s) == ANET_ERR) {
-        	perror("af_inet6 branch");
-        	goto error;
-        }
-        if (anetSetReuseAddr(err,s) == ANET_ERR) {
-        	perror("anetSetReuseAddr");
-        	goto error;
-        }
+//        if (af == AF_INET6 && anetV6Only(err,s) == ANET_ERR) {
+//        	perror("af_inet6 branch");
+//        	goto error;
+//        }
+//        if (anetSetReuseAddr(err,s) == ANET_ERR) {
+//        	perror("anetSetReuseAddr");
+//        	goto error;
+//        }
         if (anetListen(err,s,p->ai_addr,p->ai_addrlen,backlog) == ANET_ERR) {
         	s = ANET_ERR;
         	perror("error anetListen");

@@ -727,7 +727,7 @@ int main(int argc, const char **argv) {
     config.idlemode = 0;
     config.latency = NULL;
     config.clients = listCreate();
-    config.hostip = "127.0.0.1";
+    config.hostip = "12.12.12.4";
     config.hostport = 6379;
     config.hostsocket = NULL;
     config.tests = NULL;

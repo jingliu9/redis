@@ -1476,6 +1476,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     npop = zeus_peek(fd, &sga);
     c->addr.sin_port = sga.addr.sin_port;
     c->addr.sin_addr.s_addr = sga.addr.sin_addr.s_addr;
+    printf("recvd from: %x:%d\n"< c->addr.sin_addr.s_addr, c->addr.sin_port);
     if(npop <= 0){
         // make sure handled as EAGAIN
         nread = -1;
