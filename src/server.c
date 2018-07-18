@@ -34,6 +34,8 @@
 #include "latency.h"
 #include "atomicvar.h"
 
+#include "../measure.h"
+
 #include <time.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -55,6 +57,18 @@
 #include <sys/utsname.h>
 #include <locale.h>
 #include <sys/socket.h>
+
+/* object to save measurement result */
+MEASURE_RCD libos_measure_rcd;
+
+static inline uint64_t rdtsc(void)
+{
+    uint64_t eax, edx;
+    __asm volatile ("rdtsc" : "=a" (eax), "=d" (edx));
+    return (edx << 32) | eax;
+}
+
+/*-----------------------------------*/
 
 /* Our shared "common" objects */
 
@@ -3704,6 +3718,8 @@ int redisIsSupervised(int mode) {
 int main(int argc, char **argv) {
     struct timeval tv;
     int j;
+
+    libos_measure_rcd.index = 0;
 
 #ifdef REDIS_TEST
     if (argc == 3 && !strcasecmp(argv[1], "test")) {

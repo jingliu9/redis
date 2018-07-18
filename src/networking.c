@@ -33,6 +33,19 @@
 #include <math.h>
 #include <ctype.h>
 
+#include "../measure.h"
+
+/* libos_measurement  */
+extern MEASURE_RCD libos_measure_rcd;
+
+static inline uint64_t rdtsc(void)
+{
+    uint64_t eax, edx;
+    __asm volatile ("rdtsc" : "=a" (eax), "=d" (edx));
+    return (edx << 32) | eax;
+}
+/*-----------------------------------*/
+
 static void setProtocolError(const char *errstr, client *c, long pos);
 
 /* Return the size consumed from the allocator, for the specified SDS string,
@@ -899,10 +912,19 @@ int writeToClient(int fd, client *c, int handler_installed) {
     ssize_t nwritten = 0, totwritten = 0;
     size_t objlen;
     sds o;
+    // _JL_ measure write here
 
     while(clientHasPendingReplies(c)) {
         if (c->bufpos > 0) {
+#ifdef _LIBOS_MEASURE_REDIS_NETWORKING_WRITE_ID_
+            uint64_t rcd_start, rcd_end;
+            rcd_start = rdtsc();
+#endif
             nwritten = write(fd,c->buf+c->sentlen,c->bufpos-c->sentlen);
+#ifdef _LIBOS_MEASURE_REDIS_NETWORKING_WRITE_ID_
+            rcd_end = rdtsc();
+            printf("mpoint:%d time_tick:%lu\n", (_LIBOS_MEASURE_REDIS_NETWORKING_WRITE_ID_), (rcd_end - rcd_start));
+#endif
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
             totwritten += nwritten;
@@ -923,6 +945,8 @@ int writeToClient(int fd, client *c, int handler_installed) {
             }
 
             nwritten = write(fd, o + c->sentlen, objlen - c->sentlen);
+            printf("WARNING, CALL write() unexpected! will exit(1)\n");
+            exit(1);
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
             totwritten += nwritten;
@@ -1398,7 +1422,15 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     qblen = sdslen(c->querybuf);
     if (c->querybuf_peak < qblen) c->querybuf_peak = qblen;
     c->querybuf = sdsMakeRoomFor(c->querybuf, readlen);
+#ifdef _LIBOS_MEASURE_REDIS_NETWORKING_READ_ID_
+    uint64_t rcd_start, rcd_end;
+    rcd_start = rdtsc();
+#endif
     nread = read(fd, c->querybuf+qblen, readlen);
+#ifdef _LIBOS_MEASURE_REDIS_NETWORKING_READ_ID_
+    rcd_end = rdtsc();
+    printf("mpoint:%d time_tick:%lu\n", (_LIBOS_MEASURE_REDIS_NETWORKING_READ_ID_), (rcd_end - rcd_start));
+#endif
     if (nread == -1) {
         if (errno == EAGAIN) {
             return;

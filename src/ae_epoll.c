@@ -30,6 +30,14 @@
 
 
 #include <sys/epoll.h>
+#include "../measure.h"
+
+static inline uint64_t rdtsc(void)
+{
+    uint64_t eax, edx;
+    __asm volatile ("rdtsc" : "=a" (eax), "=d" (edx));
+    return (edx << 32) | eax;
+}
 
 typedef struct aeApiState {
     int epfd;
@@ -109,8 +117,16 @@ static int aeApiPoll(aeEventLoop *eventLoop, struct timeval *tvp) {
     aeApiState *state = eventLoop->apidata;
     int retval, numevents = 0;
 
+#ifdef _LIBOS_MEASURE_REDIS_AEEPOLL_EPOLLWAIT_ID_
+    uint64_t rcd_start, rcd_end;
+    rcd_start = rdtsc();
+#endif
     retval = epoll_wait(state->epfd,state->events,eventLoop->setsize,
             tvp ? (tvp->tv_sec*1000 + tvp->tv_usec/1000) : -1);
+#ifdef _LIBOS_MEASURE_REDIS_AEEPOLL_EPOLLWAIT_ID_
+    rcd_end = rdtsc();
+    printf("mpoint:%d time_tick:%lu\n", (_LIBOS_MEASURE_REDIS_AEEPOLL_EPOLLWAIT_ID_), (rcd_end - rcd_start));
+#endif
     if (retval > 0) {
         int j;
 
