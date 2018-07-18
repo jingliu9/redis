@@ -1852,16 +1852,12 @@ void initServer(void) {
     }
     server.db = zmalloc(sizeof(redisDb)*server.dbnum);
 
-    printf("created event loop\n");
-
     /* Open the TCP listening socket for the user commands. */
     if (server.port != 0 &&
         listenToPort(server.port,server.ipfd,&server.ipfd_count) == C_ERR) {
     	perror("error listening:");
         exit(1);
     }
-
-    printf("listened\n");
 
     /* _JL_ record the listening port */
     int ii;
@@ -1874,8 +1870,6 @@ void initServer(void) {
         //printf("server.c/initServer@@@@@@  listen_fds[%d] = %d\n", ii, server.el->listen_fds[ii]);
     }
 
-
-    printf("unix socket\n");
     /* Open the listening Unix domain socket. */
     if (server.unixsocket != NULL) {
         unlink(server.unixsocket); /* don't care if this fails */
@@ -1887,8 +1881,6 @@ void initServer(void) {
         }
         anetNonBlock(NULL,server.sofd);
     }
-
-    printf("unix socket done\n");
 
     /* Abort if there are no listening sockets at all. */
     if (server.ipfd_count == 0 && server.sofd < 0) {
@@ -3900,16 +3892,12 @@ int main(int argc, char **argv) {
     int background = server.daemonize && !server.supervised;
     if (background) daemonize();
 
-    printf("init server\n");
 
     initServer();
-    printf("server inited\n");
     if (background || server.pidfile) createPidFile();
     redisSetProcTitle(argv[0]);
     redisAsciiArt();
     checkTcpBacklogSettings();
-
-    printf("here\n");
 
     if (!server.sentinel_mode) {
         /* Things not needed when running in Sentinel mode. */

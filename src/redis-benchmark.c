@@ -51,7 +51,7 @@
 #define UNUSED(V) ((void) V)
 #define RANDPTR_INITIAL_SIZE 8
 
-#define _REDIS_BENCH_ZEUS_DEBUG_ 0
+#define _REDIS_BENCH_ZEUS_DEBUG_ 1
 
 static struct config {
     aeEventLoop *el;
