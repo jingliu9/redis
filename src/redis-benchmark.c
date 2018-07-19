@@ -515,6 +515,8 @@ static void benchmark(char *title, char *cmd, int len) {
     aeMain(config.el);
     config.totlatency = mstime()-config.start;
 
+    printf("benchmark: done, showing latency report\n");
+
     showLatencyReport();
     freeAllClients();
 }

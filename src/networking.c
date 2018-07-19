@@ -70,7 +70,7 @@ int listMatchObjects(void *a, void *b) {
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
 
-    if(REDIS_ZEUS_DEBUG) printf("createClient fd:%d\n", fd);
+    //if(REDIS_ZEUS_DEBUG) printf("createClient fd:%d\n", fd);
 
     /* passing -1 as fd it is possible to create a non connected client.
      * This is useful since all the commands needs to be executed
@@ -137,7 +137,6 @@ client *createClient(int fd) {
     c->peerid = NULL;
     listSetFreeMethod(c->pubsub_patterns,decrRefCountVoid);
     listSetMatchMethod(c->pubsub_patterns,listMatchObjects);
-    c->inflight = 0;
     if (fd != -1) listAddNodeTail(server.clients,c);
     initClientMultiState(c);
     return c;
@@ -616,7 +615,7 @@ int clientHasPendingReplies(client *c) {
 static void acceptCommonHandler(int fd, int flags, char *ip) {
     client *c;
 
-    if(REDIS_ZEUS_DEBUG) printf("acceptCommonHandler fd %d\n", fd);
+    //if(REDIS_ZEUS_DEBUG) printf("acceptCommonHandler fd %d\n", fd);
     if ((c = createClient(fd)) == NULL) {
         serverLog(LL_WARNING,
             "Error registering fd event for the new client: %s (fd=%d)",
@@ -924,6 +923,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
             sga.bufs[0].len = c->bufpos-c->sentlen;
             sga.addr.sin_port = c->addr.sin_port;
             sga.addr.sin_addr.s_addr = c->addr.sin_addr.s_addr;
+            printf("writeToClient: sending to %x:%d\n", sga.addr.sin_addr.s_addr, sga.addr.sin_port);
             if(REDIS_ZEUS_DEBUG) printf("before zeus_push\n");
             //nwritten = zeus_push(fd, &sga);
             npush = zeus_push(fd, &sga);
@@ -1022,7 +1022,6 @@ int writeToClient(int fd, client *c, int handler_installed) {
             freeClient(c);
             return C_ERR;
         }
-        c->inflight = 0;
     }
     if(REDIS_ZEUS_DEBUG) printf("return from writeToClient\n");
     server.el->write_fds[fd] = -1;
@@ -1428,13 +1427,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(mask);
     UNUSED(nwait);
 
-    if(c->inflight > 0) {
-      return;
-    } else {
-      c->inflight++;
-    }
-
-    if(REDIS_ZEUS_DEBUG) printf("networking.c/readQueryFromClient\n");
+    //if(REDIS_ZEUS_DEBUG) printf("networking.c/readQueryFromClient\n");
 
     readlen = PROTO_IOBUF_LEN;
     /* If this is a multi bulk request, and we are processing a bulk reply
@@ -1475,11 +1468,12 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     **/
 
 
-    // use light_pop
+    // use peek
     npop = zeus_peek(fd, &sga);
+    if (npop > 0)
+    	printf("readQueryFromClient: received from: %x:%d\n", sga.addr.sin_addr.s_addr, sga.addr.sin_port);
     c->addr.sin_port = sga.addr.sin_port;
     c->addr.sin_addr.s_addr = sga.addr.sin_addr.s_addr;
-    printf("recvd from: %x:%d\n"< c->addr.sin_addr.s_addr, c->addr.sin_port);
 
     if(npop <= 0){
         // make sure handled as EAGAIN

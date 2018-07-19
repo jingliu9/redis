@@ -43,7 +43,7 @@ WARNINGS=-Wall -W -Wstrict-prototypes -Wwrite-strings
 DEBUG_FLAGS?= -g -ggdb
 
 ZEUS_CFLAGS := -I../../../../include
-ZEUS_LDFLAGS := -L../../../../ -lzeus_lwip -Wl,-rpath=${HOME}/datacenter-OS/
+ZEUS_LDFLAGS := -L../../../../ -lzeus_posix -Wl,-rpath=${HOME}/datacenter-OS/
 
 CFLAGS += $(ZEUS_CFLAGS)
 LDFLAGS += $(ZEUS_LDFLAGS)

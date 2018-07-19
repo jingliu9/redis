@@ -459,7 +459,6 @@ static int anetListen(char *err, int s, struct sockaddr *sa, socklen_t len, int 
     // printf("_JL_@@@anet.c anetListen\n");
     //if (bind(s,sa,len) == -1) {
     if (zeus_bind(s,sa,len) == -1) {
-    	perror("anetListen zeus_bind");
         anetSetError(err, "bind: %s", strerror(errno));
         close(s);
         return ANET_ERR;
@@ -479,7 +478,6 @@ static int anetListen(char *err, int s, struct sockaddr *sa, socklen_t len, int 
 static int anetV6Only(char *err, int s) {
     int yes = 1;
     if (setsockopt(s,IPPROTO_IPV6,IPV6_V6ONLY,&yes,sizeof(yes)) == -1) {
-    	perror("setsockopt");
         anetSetError(err, "setsockopt: %s", strerror(errno));
         close(s);
         return ANET_ERR;
@@ -510,14 +508,14 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
         	continue;
         }
 
-//        if (af == AF_INET6 && anetV6Only(err,s) == ANET_ERR) {
-//        	perror("af_inet6 branch");
-//        	goto error;
-//        }
-//        if (anetSetReuseAddr(err,s) == ANET_ERR) {
-//        	perror("anetSetReuseAddr");
-//        	goto error;
-//        }
+        if (af == AF_INET6 && anetV6Only(err,s) == ANET_ERR) {
+            printf("af == AF_INET6 and error\n");
+            goto error;
+        }
+        if (anetSetReuseAddr(err,s) == ANET_ERR) {
+            goto error;
+        }
+
         if (anetListen(err,s,p->ai_addr,p->ai_addrlen,backlog) == ANET_ERR) {
         	s = ANET_ERR;
         }
@@ -531,11 +529,9 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
 
 error:
     if (s != -1) close(s);
-    perror("whoopsie");
     s = ANET_ERR;
 end:
     freeaddrinfo(servinfo);
-    perror("returning from _anetTcpServer");
     return s;
 }
 

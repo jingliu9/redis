@@ -1101,7 +1101,6 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
                 break;
             }
          }
-#if 0
          /* Trigger an AOF rewrite if needed. */
          if (server.aof_state == AOF_ON &&
              server.rdb_child_pid == -1 &&
@@ -1117,7 +1116,6 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
                 rewriteAppendOnlyFileBackground();
             }
          }
-#endif
     }
 
 
@@ -1775,6 +1773,7 @@ int listenToPort(int port, int *fds, int *count) {
         anetNonBlock(NULL,fds[*count]);
         (*count)++;
     }
+    printf("===========count: %d==================\n", (*count));
     return C_OK;
 }
 
@@ -1941,15 +1940,15 @@ void initServer(void) {
 
     /* Create an event handler for accepting new connections in TCP and Unix
      * domain sockets. */
-//    printf("server.c/initServer@@@@@@ ipfd_count:%d\n", server.ipfd_count);
-//    for (j = 0; j < server.ipfd_count; j++) {
-//        if (aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
-//            acceptTcpHandler,NULL) == AE_ERR)
-//            {
-//                serverPanic(
-//                    "Unrecoverable error creating server.ipfd file event.");
-//            }
-//    }
+    printf("server.c/initServer@@@@@@ ipfd_count:%d\n", server.ipfd_count);
+    for (j = 0; j < server.ipfd_count; j++) {
+        if (aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
+            acceptTcpHandler,NULL) == AE_ERR)
+            {
+                serverPanic(
+                    "Unrecoverable error creating server.ipfd file event.");
+            }
+    }
     if (server.sofd > 0 && aeCreateFileEvent(server.el,server.sofd,AE_READABLE,
         acceptUnixHandler,NULL) == AE_ERR) serverPanic("Unrecoverable error creating server.sofd file event.");
 

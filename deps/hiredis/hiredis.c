@@ -890,12 +890,12 @@ int redisBufferWrite(redisContext *c, int *done) {
 
     if (sdslen(c->obuf) > 0) {
         // ZEUS
-    	zeus_sgarray sga;
-    	sga.num_bufs = 1;
-    	sga.bufs[0].buf = c->obuf;
-    	sga.bufs[0].len = sdslen(c->obuf);
-        nwritten = zeus_push(c->fd, &sga);
-        //nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
+//    	zeus_sgarray sga;
+//    	sga.num_bufs = 1;
+//    	sga.bufs[0].buf = c->obuf;
+//    	sga.bufs[0].len = sdslen(c->obuf);
+//        nwritten = zeus_push(c->fd, &sga);
+        nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
         if (nwritten == -1) {
             if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
                 /* Try again later */
