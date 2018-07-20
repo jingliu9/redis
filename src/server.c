@@ -1756,7 +1756,6 @@ int listenToPort(int port, int *fds, int *count) {
             /* Bind IPv6 address. */
             /* _JL_ not use IPv6 */
             //fds[*count] = anetTcp6Server(server.neterr,port,server.bindaddr[j], server.tcp_backlog);
-            fprintf(stderr, "_JL_@@@ error: server.bindaddr[%d] is ipv6 addr. WE DO NOT HANDLE THIS!\n", j);
         } else {
             /* Bind IPv4 address. */
             fds[*count] = anetTcpServer(server.neterr,port,server.bindaddr[j],
@@ -1773,7 +1772,6 @@ int listenToPort(int port, int *fds, int *count) {
         anetNonBlock(NULL,fds[*count]);
         (*count)++;
     }
-    printf("===========count: %d==================\n", (*count));
     return C_OK;
 }
 
@@ -1864,7 +1862,6 @@ void initServer(void) {
     server.el->listen_fd_sum = server.ipfd_count;
     for(ii = 0; ii < server.ipfd_count; ii++) {
         server.el->listen_fds[server.ipfd[ii]] = server.ipfd[ii];
-        printf("server.c/initServer@@@@@@  listen_fds[%d] = %d\n", server.ipfd[ii], server.ipfd[ii]);
         //server.el->listen_fds[ii] = server.ipfd[ii];
         //printf("server.c/initServer@@@@@@  listen_fds[%d] = %d\n", ii, server.el->listen_fds[ii]);
     }
@@ -1940,7 +1937,6 @@ void initServer(void) {
 
     /* Create an event handler for accepting new connections in TCP and Unix
      * domain sockets. */
-    printf("server.c/initServer@@@@@@ ipfd_count:%d\n", server.ipfd_count);
     for (j = 0; j < server.ipfd_count; j++) {
         if (aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
             acceptTcpHandler,NULL) == AE_ERR)

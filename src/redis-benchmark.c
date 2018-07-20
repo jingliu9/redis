@@ -51,7 +51,7 @@
 #define UNUSED(V) ((void) V)
 #define RANDPTR_INITIAL_SIZE 8
 
-#define _REDIS_BENCH_ZEUS_DEBUG_ 1
+#define _REDIS_BENCH_ZEUS_DEBUG_ 0
 
 static struct config {
     aeEventLoop *el;
@@ -181,7 +181,6 @@ static void clientDone(client c) {
     //printf("clientDone finished:%d\n", config.requests_finished);
     //sleep(10);
     if (config.requests_finished == config.requests) {
-        printf("clientDone, finished:%d\n", config.requests);
         freeClient(c);
         aeStop(config.el);
         return;
@@ -278,7 +277,6 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     if (c->written == 0) {
         /* Enforce upper bound to number of requests. */
         if (config.requests_issued++ >= config.requests) {
-            printf("will freeClient issued>=request\n");
             freeClient(c);
             return;
         }
@@ -309,7 +307,6 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
             // zeus_push returns qtoken
             nwritten = -1;
             errno = EAGAIN;
-            printf("_JL_@@@ redis-benchmark.c/writeHandler PUSH return qtoken will wait\n");
             zeus_sgarray tmp_sga;
             zeus_wait(npush, &tmp_sga);
             //sleep(100);
@@ -359,7 +356,6 @@ static client createClient(char *cmd, size_t len, client from) {
 
     if (config.hostsocket == NULL) {
         c->context = redisConnectNonBlock(config.hostip,config.hostport);
-        printf("hostip: %s, hostport: %d\n", config.hostip, config.hostport);
     } else {
         c->context = redisConnectUnixNonBlock(config.hostsocket);
     }
@@ -487,6 +483,7 @@ static void showLatencyReport(void) {
 
         qsort(config.latency,config.requests,sizeof(long long),compareLatency);
         for (i = 0; i < config.requests; i++) {
+        	printf("latency %d: %ld\n", i, config.latency[i]);
             if (config.latency[i]/1000 != curlat || i == (config.requests-1)) {
                 curlat = config.latency[i]/1000;
                 perc = ((float)(i+1)*100)/config.requests;
@@ -514,8 +511,6 @@ static void benchmark(char *title, char *cmd, int len) {
     config.start = mstime();
     aeMain(config.el);
     config.totlatency = mstime()-config.start;
-
-    printf("benchmark: done, showing latency report\n");
 
     showLatencyReport();
     freeAllClients();
@@ -713,8 +708,6 @@ int main(int argc, const char **argv) {
     	printf("Error initializing Zeus!\n");
     	return -1;
     }
-
-    printf("initialized zeus\n");
 
     srandom(time(NULL));
     signal(SIGHUP, SIG_IGN);

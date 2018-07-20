@@ -619,7 +619,7 @@ void redisFree(redisContext *c) {
     if (c == NULL)
         return;
     if (c->fd > 0)
-        close(c->fd);
+        zeus_close(c->fd);
     if (c->obuf != NULL)
         sdsfree(c->obuf);
     if (c->reader != NULL)
@@ -800,7 +800,6 @@ int redisBufferRead(redisContext *c) {
 
     /* Return early when the context has seen an error. */
     if (c->err){
-        printf("hiredis/redisBufferRead c->err\n");
         return REDIS_ERR;
     }
 
@@ -809,18 +808,6 @@ int redisBufferRead(redisContext *c) {
     //printf("@@@@@@redisBufferRead/read()\n");
     //nread = read(c->fd,buf,sizeof(buf));
     zeus_sgarray sga;
-    /**
-    // use zeus_pop
-    npop = zeus_pop(c->fd, &sga);
-    if(npop == 0){
-        // pop success
-        nread = sga.bufs[0].len;
-    }else{
-        nread = -1;
-        nwait = zeus_wait(npop, &sga);
-        nread = sga.bufs[0].len;
-        printf("return value of nwait:%d nread:%d\n", nwait, nread);
-    }**/
 
     // use zeus_light_pop
     npop = zeus_peek(c->fd, &sga);
@@ -841,9 +828,7 @@ int redisBufferRead(redisContext *c) {
         // try again later
         return REDIS_OK;
     }else if(nread != -1 && nread != 0){
-        if(HIREDIS_ZEUS_DEBUG) printf("will do memcpy nread%d\n", nread);
         memcpy(buf, ptr, nread);
-        if(HIREDIS_ZEUS_DEBUG) printf("copy to buf:%s\n", buf);
     }
     if (nread == -1) {
         if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
@@ -851,12 +836,10 @@ int redisBufferRead(redisContext *c) {
         } else if (errno == 0) {
         	return REDIS_OK;
         } else {
-        	printf("redisBufferRead error: %d\n", errno);
             __redisSetError(c,REDIS_ERR_IO,NULL);
             return REDIS_ERR;
         }
     } else if (nread == 0) {
-        printf("nread == 0\n");
         __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
         return REDIS_ERR;
     } else {
@@ -886,16 +869,13 @@ int redisBufferWrite(redisContext *c, int *done) {
     if (c->err)
         return REDIS_ERR;
 
-    printf("hiredis/redisBufferWrite\n");
-
     if (sdslen(c->obuf) > 0) {
         // ZEUS
-//    	zeus_sgarray sga;
-//    	sga.num_bufs = 1;
-//    	sga.bufs[0].buf = c->obuf;
-//    	sga.bufs[0].len = sdslen(c->obuf);
-//        nwritten = zeus_push(c->fd, &sga);
-        nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
+    	zeus_sgarray sga;
+    	sga.num_bufs = 1;
+    	sga.bufs[0].buf = c->obuf;
+    	sga.bufs[0].len = sdslen(c->obuf);
+        nwritten = zeus_push(c->fd, &sga);
         if (nwritten == -1) {
             if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
                 /* Try again later */

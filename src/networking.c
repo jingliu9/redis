@@ -923,7 +923,6 @@ int writeToClient(int fd, client *c, int handler_installed) {
             sga.bufs[0].len = c->bufpos-c->sentlen;
             sga.addr.sin_port = c->addr.sin_port;
             sga.addr.sin_addr.s_addr = c->addr.sin_addr.s_addr;
-            printf("writeToClient: sending to %x:%d\n", sga.addr.sin_addr.s_addr, sga.addr.sin_port);
             if(REDIS_ZEUS_DEBUG) printf("before zeus_push\n");
             //nwritten = zeus_push(fd, &sga);
             npush = zeus_push(fd, &sga);
@@ -959,7 +958,6 @@ int writeToClient(int fd, client *c, int handler_installed) {
 
             // ZEUS
             //nwritten = write(fd, o + c->sentlen, objlen - c->sentlen);
-            printf("NO call here\n");
             exit(1);
             nwritten = write(fd, o + c->sentlen, objlen - c->sentlen);
             if (nwritten <= 0) break;
@@ -1470,8 +1468,6 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
 
     // use peek
     npop = zeus_peek(fd, &sga);
-    if (npop > 0)
-    	printf("readQueryFromClient: received from: %x:%d\n", sga.addr.sin_addr.s_addr, sga.addr.sin_port);
     c->addr.sin_port = sga.addr.sin_port;
     c->addr.sin_addr.s_addr = sga.addr.sin_addr.s_addr;
 
@@ -1482,7 +1478,6 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     }else{
         nread = npop;
         if(nread != sga.bufs[0].len){
-            printf("Error, nread:%d, len:%d\n", nread, sga.bufs[0].len);
             exit(1);
         }
         npop = 0;
@@ -2133,7 +2128,6 @@ int clientsArePaused(void) {
 int processEventsWhileBlocked(void) {
     int iterations = 4; /* See the function top-comment. */
     int count = 0;
-    printf("processEventsWhileBlocked\n");
     while (iterations--) {
         int events = 0;
         events += aeProcessEvents(server.el, AE_FILE_EVENTS|AE_DONT_WAIT);

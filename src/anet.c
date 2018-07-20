@@ -509,7 +509,6 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
         }
 
         if (af == AF_INET6 && anetV6Only(err,s) == ANET_ERR) {
-            printf("af == AF_INET6 and error\n");
             goto error;
         }
         if (anetSetReuseAddr(err,s) == ANET_ERR) {
@@ -537,13 +536,11 @@ end:
 
 int anetTcpServer(char *err, int port, char *bindaddr, int backlog)
 {
-    printf("_JL_@@@ anetTcpServer\n");
     return _anetTcpServer(err, port, bindaddr, AF_INET, backlog);
 }
 
 int anetTcp6Server(char *err, int port, char *bindaddr, int backlog)
 {
-    printf("_JL_@@@ anetTcp6Server\n");
     errno = EAFNOSUPPORT;
     return _anetTcpServer(err, port, bindaddr, AF_INET6, backlog);
 }

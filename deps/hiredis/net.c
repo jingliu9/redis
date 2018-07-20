@@ -280,7 +280,7 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     int reuses = 0;
     long timeout_msec = -1;
 
-    printf("_JL_ _redisContextConnectTcp\n");
+    //printf("_JL_ _redisContextConnectTcp\n");
     servinfo = NULL;
     c->connection_type = REDIS_CONN_TCP;
     c->tcp.port = port;
@@ -422,7 +422,7 @@ error:
     rv = REDIS_ERR;
 end:
     freeaddrinfo(servinfo);
-    printf("_JL_ _redisContextConnectTcp return\n");
+    //printf("_JL_ _redisContextConnectTcp return\n");
     return rv;  // Need to return REDIS_OK if alright
 }
 
