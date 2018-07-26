@@ -70,14 +70,14 @@ endif
 -include .make-settings
 
 ZEUS_CFLAGS := -I$(ZEUS_SRC_DIR)
-ZEUS_LDFLAGS := -L$(ZEUS_SRC_DIR) -lzeus_posix -lhoard -Wl,-rpath,$(ZEUS_SRC_DIR)
+ZEUS_LDFLAGS := -L$(ZEUS_SRC_DIR) -lzeus_lwip -lhoard -Wl,-rpath,$(ZEUS_SRC_DIR)
 
 FINAL_CFLAGS=$(STD) $(WARN) $(OPT) $(DEBUG) $(CFLAGS) $(REDIS_CFLAGS)
 FINAL_LDFLAGS=$(LDFLAGS) $(REDIS_LDFLAGS) $(DEBUG)
 FINAL_LIBS=-lm
 DEBUG=-g -ggdb
 
-ZEUS_LIBS := -L../../../ -lzeus_posix
+ZEUS_LIBS := -L../../../ -lzeus_lwip
 FINAL_CFLAGS += $(ZEUS_CFLAGS)
 FINAL_LDFLAGS += $(ZEUS_LDFLAGS)
 FINAL_LIBS += $(ZEUS_LIBS)
