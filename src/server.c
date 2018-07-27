@@ -27,6 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+
 #include "server.h"
 #include "cluster.h"
 #include "slowlog.h"
@@ -55,6 +56,38 @@
 #include <sys/utsname.h>
 #include <locale.h>
 #include <sys/socket.h>
+
+#include <mtcp_api.h>
+#include <mtcp_epoll.h>
+#include "mtcp_def.h"
+//#include "mtcp_select_end.h"
+
+/* mtcp variables */
+static char mtcp_conf_name[] = "libos.conf";
+int mtcp_ep;
+mctx_t mctx = NULL;
+
+int mtcp_env_init() {
+	int ret;
+    struct mtcp_conf mcfg;
+    int core_limit = 1;  // NOTE: JL: no consider of multi-core now
+    int core = 0;
+	mtcp_getconf(&mcfg);
+    mcfg.num_cores = core_limit;
+    mtcp_setconf(&mcfg);
+    // set core limit must be put before mtcp_init()
+    ret = mtcp_init(mtcp_conf_name);
+    ////mtcp_register_signal(SIGINT, libos_mtcp_signal_handler);
+    mtcp_core_affinitize(core);
+    mctx = mtcp_create_context(core);
+    // init epoll for mtcp
+    mtcp_ep = mtcp_epoll_create(mctx, MTCP_MAX_EVENTS);
+    if (mtcp_ep < 0) {
+        mtcp_destroy_context(mctx);
+        return -1;
+    }
+    return ret;
+}
 
 /* Our shared "common" objects */
 
@@ -1838,7 +1871,8 @@ void initServer(void) {
 
     createSharedObjects();
     adjustOpenFilesLimit();
-    server.el = aeCreateEventLoop(server.maxclients+CONFIG_FDSET_INCR);
+    serverAssert(mctx != NULL);
+    server.el = mtcp_aeCreateEventLoop(mctx, server.maxclients+CONFIG_FDSET_INCR);
     if (server.el == NULL) {
         serverLog(LL_WARNING,
             "Failed creating the event loop. Error message: '%s'",
@@ -3705,6 +3739,8 @@ int main(int argc, char **argv) {
     struct timeval tv;
     int j;
 
+    mtcp_env_init();
+
 #ifdef REDIS_TEST
     if (argc == 3 && !strcasecmp(argv[1], "test")) {
         if (!strcasecmp(argv[2], "ziplist")) {
@@ -3853,7 +3889,7 @@ int main(int argc, char **argv) {
     server.supervised = redisIsSupervised(server.supervised_mode);
     int background = server.daemonize && !server.supervised;
     if (background) daemonize();
-
+    libos_mtcp_queue(0,0,0);
     initServer();
     if (background || server.pidfile) createPidFile();
     redisSetProcTitle(argv[0]);
