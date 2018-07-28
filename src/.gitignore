@@ -3,5 +3,3 @@
 *.gcov
 redis.info
 lcov-html
-
-mtcp_select_end.h

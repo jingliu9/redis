@@ -32,7 +32,6 @@
 #define ANET_H
 
 #include <sys/types.h>
-#include <mtcp_api.h>
 
 #define ANET_OK 0
 #define ANET_ERR -1
@@ -77,15 +76,5 @@ int anetSockName(int fd, char *ip, size_t ip_len, int *port);
 int anetFormatAddr(char *fmt, size_t fmt_len, char *ip, int port);
 int anetFormatPeer(int fd, char *fmt, size_t fmt_len);
 int anetFormatSock(int fd, char *fmt, size_t fmt_len);
-
-/* mtcp anet interface */
-
-int mtcp_anetTcpConnect(mctx_t mctx, char *err, char *addr, int port);
-int mtcp_anetRead(mctx_t mctx, int fd, char *buf, int count);
-int mtcp_anetTcpAccept(mctx_t mctx, char *err, int serversock, char *ip, size_t ip_len, int *port);
-int mtcp_anetTcpServer(mctx_t mctx, char *err, int port, char *bindaddr, int backlog);
-int mtcp_anetWrite(mctx_t mctx, int fd, char *buf, int count);
-int mtcp_anetNonBlock(mctx_t mctx, char *err, int fd);
-int mtcp_anetBlock(mctx_t mctx, char *err, int fd);
 
 #endif

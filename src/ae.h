@@ -34,7 +34,6 @@
 #define __AE_H__
 
 #include <time.h>
-#include <mtcp_epoll.h>
 
 #define AE_OK 0
 #define AE_ERR -1
@@ -110,7 +109,6 @@ typedef struct aeEventLoop {
 
 /* Prototypes */
 aeEventLoop *aeCreateEventLoop(int setsize);
-aeEventLoop *mtcp_aeCreateEventLoop(mctx_t mctx, int setsize);
 void aeDeleteEventLoop(aeEventLoop *eventLoop);
 void aeStop(aeEventLoop *eventLoop);
 int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,

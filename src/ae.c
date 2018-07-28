@@ -60,14 +60,6 @@
     #endif
 #endif
 
-aeEventLoop *mtcp_aeCreateEventLoop(mctx_t mctx, int setsize) {
-    aeEventLoop *eventLoop = aeCreateEventLoop(setsize);
-    aeApiState *state = eventLoop->apidata;
-    state->mctx = mctx;
-    return eventLoop;
-}
- 
-
 aeEventLoop *aeCreateEventLoop(int setsize) {
     aeEventLoop *eventLoop;
     int i;
