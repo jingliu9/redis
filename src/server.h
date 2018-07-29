@@ -331,7 +331,9 @@ typedef long long mstime_t; /* millisecond time type. */
 #define SUPERVISED_UPSTART 3
 
 /* Anti-warning macro... */
+#ifndef UNUSED
 #define UNUSED(V) ((void) V)
+#endif
 
 #define ZSKIPLIST_MAXLEVEL 32 /* Should be enough for 2^32 elements */
 #define ZSKIPLIST_P 0.25      /* Skiplist P = 1/4 */

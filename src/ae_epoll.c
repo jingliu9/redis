@@ -30,10 +30,16 @@
 
 
 #include <sys/epoll.h>
+#include <mtcp_epoll.h>
+#include <mtcp_api.h>
 
 typedef struct aeApiState {
+    // POSIX epoll events
     int epfd;
     struct epoll_event *events;
+    // mtcp event (for Network)
+    mctx_t mctx;
+    struct mtcp_epoll_event *mtcp_events;
 } aeApiState;
 
 static int aeApiCreate(aeEventLoop *eventLoop) {
@@ -59,6 +65,7 @@ static int aeApiResize(aeEventLoop *eventLoop, int setsize) {
     aeApiState *state = eventLoop->apidata;
 
     state->events = zrealloc(state->events, sizeof(struct epoll_event)*setsize);
+    state->mtcp_events = zrealloc(state->mtcp_events, sizeof(struct mtcp_epoll_event));
     return 0;
 }
 
@@ -67,6 +74,7 @@ static void aeApiFree(aeEventLoop *eventLoop) {
 
     close(state->epfd);
     zfree(state->events);
+    zfree(state->mtcp_events);
     zfree(state);
 }
 
@@ -127,9 +135,74 @@ static int aeApiPoll(aeEventLoop *eventLoop, struct timeval *tvp) {
             eventLoop->fired[j].mask = mask;
         }
     }
+    eventLoop->fired_numevents = numevents;
     return numevents;
 }
 
 static char *aeApiName(void) {
     return "epoll";
 }
+
+/***********************************************************************************/
+static int mtcp_aeApiAddEvent(aeEventLoop *eventLoop, int fd, int mask) {
+    aeApiState *state = eventLoop->apidata;
+    UNUSED(state);
+    struct mtcp_epoll_event ee = {0}; /* avoid valgrind warning */
+    /* If the fd was already monitored for some event, we need a MOD
+     * operation. Otherwise we need an ADD operation. */
+    int op = eventLoop->events[fd].mask == AE_NONE ?
+            EPOLL_CTL_ADD : EPOLL_CTL_MOD;
+
+    ee.events = 0;
+    mask |= eventLoop->events[fd].mask; /* Merge old events */
+    if (mask & AE_READABLE) ee.events |= EPOLLIN;
+    if (mask & AE_WRITABLE) ee.events |= EPOLLOUT;
+    ee.data.sockid = fd;
+    if (mtcp_epoll_ctl(eventLoop->mctx, eventLoop->mtcp_ep,op,fd,&ee) == -1) return -1;
+    return 0;
+}
+
+static void mtcp_aeApiDelEvent(aeEventLoop *eventLoop, int fd, int delmask) {
+    aeApiState *state = eventLoop->apidata;
+    UNUSED(state);
+    struct mtcp_epoll_event ee = {0}; /* avoid valgrind warning */
+    int mask = eventLoop->events[fd].mask & (~delmask);
+
+    ee.events = 0;
+    if (mask & AE_READABLE) ee.events |= EPOLLIN;
+    if (mask & AE_WRITABLE) ee.events |= EPOLLOUT;
+    ee.data.sockid = fd;
+    if (mask != AE_NONE) {
+        mtcp_epoll_ctl(eventLoop->mctx,eventLoop->mtcp_ep,EPOLL_CTL_MOD,fd,&ee);
+    } else {
+        /* Note, Kernel < 2.6.9 requires a non null event pointer even for
+         * EPOLL_CTL_DEL. */
+        mtcp_epoll_ctl(eventLoop->mctx,eventLoop->mtcp_ep,EPOLL_CTL_DEL,fd,&ee);
+    }
+}
+
+static int mtcp_aeApiPoll(aeEventLoop *eventLoop, struct timeval *tvp) {
+    aeApiState *state = eventLoop->apidata;
+    int retval, numevents = 0;
+
+    retval = mtcp_epoll_wait(eventLoop->mctx, eventLoop->mtcp_ep,state->mtcp_events,eventLoop->setsize,
+            tvp ? (tvp->tv_sec*1000 + tvp->tv_usec/1000) : -1);
+    if (retval > 0) {
+        int j;
+
+        numevents = retval;
+        for (j = 0; j < numevents; j++) {
+            int mask = 0;
+            struct mtcp_epoll_event *e = state->mtcp_events+(j+eventLoop->fired_numevents);
+
+            if (e->events & EPOLLIN) mask |= AE_READABLE;
+            if (e->events & EPOLLOUT) mask |= AE_WRITABLE;
+            if (e->events & EPOLLERR) mask |= AE_WRITABLE;
+            if (e->events & EPOLLHUP) mask |= AE_WRITABLE;
+            eventLoop->fired[j].fd = e->data.sockid;
+            eventLoop->fired[j].mask = mask;
+        }
+    }
+    return numevents;
+}
+

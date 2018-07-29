@@ -54,7 +54,9 @@
 #include "anet.h"
 #include "ae.h"
 
+#ifndef UNUSED
 #define UNUSED(V) ((void) V)
+#endif
 
 #define OUTPUT_STANDARD 0
 #define OUTPUT_RAW 1

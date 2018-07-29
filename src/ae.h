@@ -34,6 +34,7 @@
 #define __AE_H__
 
 #include <time.h>
+#include <mtcp_api.h>
 
 #define AE_OK 0
 #define AE_ERR -1
@@ -105,10 +106,14 @@ typedef struct aeEventLoop {
     void *apidata; /* This is used for polling API specific data */
     aeBeforeSleepProc *beforesleep;
     aeBeforeSleepProc *aftersleep;
+    mctx_t mctx;
+    int mtcp_ep;
+    unsigned int fired_numevents;   /* record numevents fired by POSIX epoll_wait */
 } aeEventLoop;
 
 /* Prototypes */
 aeEventLoop *aeCreateEventLoop(int setsize);
+int aeInitMtcp(aeEventLoop *eventLoop, char *conf_name);
 void aeDeleteEventLoop(aeEventLoop *eventLoop);
 void aeStop(aeEventLoop *eventLoop);
 int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
@@ -128,4 +133,8 @@ void aeSetAfterSleepProc(aeEventLoop *eventLoop, aeBeforeSleepProc *aftersleep);
 int aeGetSetSize(aeEventLoop *eventLoop);
 int aeResizeSetSize(aeEventLoop *eventLoop, int setsize);
 
+/* funcs use mtcp_epoll events */
+int mtcp_aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
+        aeFileProc *proc, void *clientData);
+void mtcp_aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask);
 #endif

@@ -32,6 +32,7 @@
 #include <sys/uio.h>
 #include <math.h>
 #include <ctype.h>
+#include <mtcp_api.h>
 
 static void setProtocolError(const char *errstr, client *c, long pos);
 
@@ -75,14 +76,14 @@ client *createClient(int fd) {
      * in the context of a client. When commands are executed in other
      * contexts (for instance a Lua script) we need a non connected client. */
     if (fd != -1) {
-        anetNonBlock(NULL,fd);
-        anetEnableTcpNoDelay(NULL,fd);
+        mtcp_anetNonBlock(server.el->mctx, NULL,fd);
+        mtcp_anetEnableTcpNoDelay(server.el->mctx, NULL,fd);
         if (server.tcpkeepalive)
-            anetKeepAlive(NULL,fd,server.tcpkeepalive);
-        if (aeCreateFileEvent(server.el,fd,AE_READABLE,
+            mtcp_anetKeepAlive(server.el->mctx,NULL,fd,server.tcpkeepalive);
+        if (mtcp_aeCreateFileEvent(server.el,fd,AE_READABLE,
             readQueryFromClient, c) == AE_ERR)
         {
-            close(fd);
+            mtcp_close(server.el->mctx,fd);
             zfree(c);
             return NULL;
         }
@@ -625,7 +626,8 @@ static void acceptCommonHandler(int fd, int flags, char *ip) {
         char *err = "-ERR max number of clients reached\r\n";
 
         /* That's a best effort error message, don't check write errors */
-        if (write(c->fd,err,strlen(err)) == -1) {
+        //if (write(c->fd,err,strlen(err)) == -1) {
+        if (mtcp_write(server.el->mctx,c->fd,err,strlen(err)) == -1) {
             /* Nothing to do, Just to avoid the warning... */
         }
         server.stat_rejected_conn++;
@@ -665,7 +667,8 @@ static void acceptCommonHandler(int fd, int flags, char *ip) {
                 "4) Setup a bind address or an authentication password. "
                 "NOTE: You only need to do one of the above things in order for "
                 "the server to start accepting connections from the outside.\r\n";
-            if (write(c->fd,err,strlen(err)) == -1) {
+            //if (write(c->fd,err,strlen(err)) == -1) {
+            if (mtcp_write(server.el->mctx, c->fd,err,strlen(err)) == -1) {
                 /* Nothing to do, Just to avoid the warning... */
             }
             server.stat_rejected_conn++;
@@ -686,7 +689,7 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(privdata);
 
     while(max--) {
-        cfd = anetTcpAccept(server.neterr, fd, cip, sizeof(cip), &cport);
+        cfd = mtcp_anetTcpAccept(server.el->mctx, server.neterr, fd, cip, sizeof(cip), &cport);
         if (cfd == ANET_ERR) {
             if (errno != EWOULDBLOCK)
                 serverLog(LL_WARNING,
@@ -754,8 +757,8 @@ void unlinkClient(client *c) {
         listDelNode(server.clients,ln);
 
         /* Unregister async I/O handlers and close the socket. */
-        aeDeleteFileEvent(server.el,c->fd,AE_READABLE);
-        aeDeleteFileEvent(server.el,c->fd,AE_WRITABLE);
+        mtcp_aeDeleteFileEvent(server.el,c->fd,AE_READABLE);
+        mtcp_aeDeleteFileEvent(server.el,c->fd,AE_WRITABLE);
         close(c->fd);
         c->fd = -1;
     }
@@ -902,7 +905,8 @@ int writeToClient(int fd, client *c, int handler_installed) {
 
     while(clientHasPendingReplies(c)) {
         if (c->bufpos > 0) {
-            nwritten = write(fd,c->buf+c->sentlen,c->bufpos-c->sentlen);
+            //nwritten = write(fd,c->buf+c->sentlen,c->bufpos-c->sentlen);
+            nwritten = mtcp_write(server.el->mctx, fd,c->buf+c->sentlen,c->bufpos-c->sentlen);
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
             totwritten += nwritten;
@@ -922,7 +926,8 @@ int writeToClient(int fd, client *c, int handler_installed) {
                 continue;
             }
 
-            nwritten = write(fd, o + c->sentlen, objlen - c->sentlen);
+            //nwritten = write(fd, o + c->sentlen, objlen - c->sentlen);
+            nwritten = mtcp_write(server.el->mctx, fd, o + c->sentlen, objlen - c->sentlen);
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
             totwritten += nwritten;
@@ -975,7 +980,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
     }
     if (!clientHasPendingReplies(c)) {
         c->sentlen = 0;
-        if (handler_installed) aeDeleteFileEvent(server.el,c->fd,AE_WRITABLE);
+        if (handler_installed) mtcp_aeDeleteFileEvent(server.el,c->fd,AE_WRITABLE);
 
         /* Close connection after entire reply has been sent. */
         if (c->flags & CLIENT_CLOSE_AFTER_REPLY) {
@@ -1025,7 +1030,7 @@ int handleClientsWithPendingWrites(void) {
             {
                 ae_flags |= AE_BARRIER;
             }
-            if (aeCreateFileEvent(server.el, c->fd, ae_flags,
+            if (mtcp_aeCreateFileEvent(server.el, c->fd, ae_flags,
                 sendReplyToClient, c) == AE_ERR)
             {
                     freeClientAsync(c);
@@ -1398,7 +1403,8 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     qblen = sdslen(c->querybuf);
     if (c->querybuf_peak < qblen) c->querybuf_peak = qblen;
     c->querybuf = sdsMakeRoomFor(c->querybuf, readlen);
-    nread = read(fd, c->querybuf+qblen, readlen);
+    //nread = read(fd, c->querybuf+qblen, readlen);
+    nread = mtcp_read(el->mctx, fd, c->querybuf+qblen, readlen);
     if (nread == -1) {
         if (errno == EAGAIN) {
             return;

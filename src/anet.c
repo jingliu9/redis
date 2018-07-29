@@ -45,6 +45,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "anet.h"
 
@@ -96,6 +97,8 @@ int anetKeepAlive(char *err, int fd, int interval)
 {
     int val = 1;
 
+    printf("anet.c/anetKeepAlive\n");
+    exit(1);
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1)
     {
         anetSetError(err, "setsockopt SO_KEEPALIVE: %s", strerror(errno));
@@ -272,6 +275,8 @@ static int anetTcpGenericConnect(char *err, char *addr, int port,
     char portstr[6];  /* strlen("65535") + 1; */
     struct addrinfo hints, *servinfo, *bservinfo, *p, *b;
 
+    printf("anet.c/anetTcpGenericConnect\n");
+
     snprintf(portstr,sizeof(portstr),"%d",port);
     memset(&hints,0,sizeof(hints));
     hints.ai_family = AF_UNSPEC;
@@ -413,6 +418,7 @@ int anetRead(int fd, char *buf, int count)
 {
     ssize_t nread, totlen = 0;
     while(totlen != count) {
+        // JL: I'm not sure this could be called or not
         nread = read(fd,buf,count-totlen);
         if (nread == 0) return totlen;
         if (nread == -1) return -1;
@@ -656,3 +662,201 @@ int anetFormatSock(int fd, char *fmt, size_t fmt_len) {
     anetSockName(fd,ip,sizeof(ip),&port);
     return anetFormatAddr(fmt, fmt_len, ip, port);
 }
+
+
+/*****************************************************************************************/
+/*****************************************************************************************/
+int mtcp_anetKeepAlive(mctx_t mctx, char *err, int fd, int interval)
+{
+    int val = 1;
+
+    if (mtcp_setsockopt(mctx, fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1)
+    {
+        anetSetError(err, "setsockopt SO_KEEPALIVE: %s", strerror(errno));
+        return ANET_ERR;
+    }
+
+#ifdef __linux__
+    /* Default settings are more or less garbage, with the keepalive time
+     * set to 7200 by default on Linux. Modify settings to make the feature
+     * actually useful. */
+
+    /* Send first probe after interval. */
+    val = interval;
+    if (mtcp_setsockopt(mctx, fd, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
+        anetSetError(err, "setsockopt TCP_KEEPIDLE: %s\n", strerror(errno));
+        return ANET_ERR;
+    }
+
+    /* Send next probes after the specified interval. Note that we set the
+     * delay as interval / 3, as we send three probes before detecting
+     * an error (see the next setsockopt call). */
+    val = interval/3;
+    if (val == 0) val = 1;
+    if (mtcp_setsockopt(mctx, fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {
+        anetSetError(err, "setsockopt TCP_KEEPINTVL: %s\n", strerror(errno));
+        return ANET_ERR;
+    }
+
+    /* Consider the socket in error state after three we send three ACK
+     * probes without getting a reply. */
+    val = 3;
+    if (mtcp_setsockopt(mctx, fd, IPPROTO_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {
+        anetSetError(err, "setsockopt TCP_KEEPCNT: %s\n", strerror(errno));
+        return ANET_ERR;
+    }
+#else
+    ((void) interval); /* Avoid unused var warning for non Linux systems. */
+#endif
+
+    return ANET_OK;
+}
+
+int mtcp_anetSendTimeout(mctx_t mctx, char *err, int fd, long long ms) {
+    struct timeval tv;
+
+    tv.tv_sec = ms/1000;
+    tv.tv_usec = (ms%1000)*1000;
+    if (mtcp_setsockopt(mctx, fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) == -1) {
+        anetSetError(err, "setsockopt SO_SNDTIMEO: %s", strerror(errno));
+        return ANET_ERR;
+    }
+    return ANET_OK;
+}
+
+static int mtcp_anetSetTcpNoDelay(mctx_t mctx, char *err, int fd, int val)
+{
+    if (mtcp_setsockopt(mctx, fd, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val)) == -1)
+    {
+        anetSetError(err, "setsockopt TCP_NODELAY: %s", strerror(errno));
+        return ANET_ERR;
+    }
+    return ANET_OK;
+}
+
+int mtcp_anetEnableTcpNoDelay(mctx_t mctx, char *err, int fd)
+{
+    return mtcp_anetSetTcpNoDelay(mctx, err, fd, 1);
+}
+
+int mtcp_anetDisableTcpNoDelay(mctx_t mctx, char *err, int fd)
+{
+    return mtcp_anetSetTcpNoDelay(mctx, err, fd, 0);
+}
+
+/* called multi-times in XXX_connect() */
+static int mtcp_anetSetReuseAddr(mctx_t mctx, char *err, int fd) {
+    int yes = 1;
+    /* Make sure connection-intensive things like the redis benckmark
+     * will be able to close/open sockets a zillion of times */
+    if (mtcp_setsockopt(mctx, fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
+        anetSetError(err, "setsockopt SO_REUSEADDR: %s", strerror(errno));
+        return ANET_ERR;
+    }
+    return ANET_OK;
+}
+
+static int mtcp_anetListen(mctx_t mctx, char *err, int s, struct sockaddr *sa, socklen_t len, int backlog) {
+    if (mtcp_bind(mctx, s,sa,len) == -1) {
+        anetSetError(err, "bind: %s", strerror(errno));
+        mtcp_close(mctx, s);
+        return ANET_ERR;
+    }
+
+    if (mtcp_listen(mctx, s, backlog) == -1) {
+        anetSetError(err, "listen: %s", strerror(errno));
+        mtcp_close(mctx, s);
+        return ANET_ERR;
+    }
+    return ANET_OK;
+}
+
+static int _mtcp_anetTcpServer(mctx_t mctx, char *err, int port, char *bindaddr, int af, int backlog)
+{
+    int s = -1, rv;
+    char _port[6];  /* strlen("65535") */
+    struct addrinfo hints, *servinfo, *p;
+
+    snprintf(_port,6,"%d",port);
+    memset(&hints,0,sizeof(hints));
+    hints.ai_family = af;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;    /* No effect if bindaddr != NULL */
+
+    if ((rv = getaddrinfo(bindaddr,_port,&hints,&servinfo)) != 0) {
+        anetSetError(err, "%s", gai_strerror(rv));
+        return ANET_ERR;
+    }
+    for (p = servinfo; p != NULL; p = p->ai_next) {
+        if ((s = mtcp_socket(mctx, p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+            continue;
+
+        /* NOTE: here not supposed to call anetV6Only, let's see if problems */
+        if (af == AF_INET6 && anetV6Only(err,s) == ANET_ERR) goto error;
+        if (mtcp_anetSetReuseAddr(mctx, err,s) == ANET_ERR) goto error;
+        if (mtcp_anetListen(mctx, err,s,p->ai_addr,p->ai_addrlen,backlog) == ANET_ERR) s = ANET_ERR;
+        goto end;
+    }
+    if (p == NULL) {
+        anetSetError(err, "unable to bind socket, errno: %d", errno);
+        goto error;
+    }
+
+error:
+    if (s != -1) mtcp_close(mctx, s);
+    s = ANET_ERR;
+end:
+    freeaddrinfo(servinfo);
+    return s;
+}
+
+int mtcp_anetTcpServer(mctx_t mctx, char *err, int port, char *bindaddr, int backlog)
+{
+    return _mtcp_anetTcpServer(mctx, err, port, bindaddr, AF_INET, backlog);
+}
+
+static int mtcp_anetGenericAccept(mctx_t mctx, char *err, int s, struct sockaddr *sa, socklen_t *len) {
+    int fd;
+    while(1) {
+        fd = mtcp_accept(mctx, s,sa,len);
+        if (fd == -1) {
+            if (errno == EINTR)
+                continue;
+            else {
+                anetSetError(err, "accept: %s", strerror(errno));
+                return ANET_ERR;
+            }
+        }
+        break;
+    }
+    return fd;
+}
+
+int mtcp_anetTcpAccept(mctx_t mctx, char *err, int s, char *ip, size_t ip_len, int *port) {
+    int fd;
+    struct sockaddr_storage sa;
+    socklen_t salen = sizeof(sa);
+    if ((fd = mtcp_anetGenericAccept(mctx, err,s,(struct sockaddr*)&sa,&salen)) == -1)
+        return ANET_ERR;
+
+    if (sa.ss_family == AF_INET) {
+        struct sockaddr_in *s = (struct sockaddr_in *)&sa;
+        if (ip) inet_ntop(AF_INET,(void*)&(s->sin_addr),ip,ip_len);
+        if (port) *port = ntohs(s->sin_port);
+    } else {
+        struct sockaddr_in6 *s = (struct sockaddr_in6 *)&sa;
+        if (ip) inet_ntop(AF_INET6,(void*)&(s->sin6_addr),ip,ip_len);
+        if (port) *port = ntohs(s->sin6_port);
+    }
+    return fd;
+}
+
+
+
+int mtcp_anetNonBlock(mctx_t mctx, char *err, int fd) {
+    UNUSED(err);
+    return mtcp_setsock_nonblock(mctx, fd);
+}
+
+/***************************************************************/
+

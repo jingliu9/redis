@@ -44,6 +44,8 @@
 #include "zmalloc.h"
 #include "config.h"
 
+#include "mtcp_def.h"
+
 /* Include the best multiplexing layer supported by this system.
  * The following should be ordered by performances, descending. */
 #ifdef HAVE_EVPORT
@@ -90,6 +92,35 @@ err:
         zfree(eventLoop);
     }
     return NULL;
+}
+
+int aeInitMtcp(aeEventLoop *eventLoop, char *conf_name) {
+	int ret;
+    struct mtcp_conf mcfg;
+    int core_limit = 1;  // NOTE: JL: no consider of multi-core now
+    int core = 0;
+    mtcp_getconf(&mcfg);
+    mcfg.num_cores = core_limit;
+    mtcp_setconf(&mcfg);
+    // set core limit must be put before mtcp_init()
+    ret = mtcp_init(conf_name);
+    ////mtcp_register_signal(SIGINT, libos_mtcp_signal_handler);
+    mtcp_core_affinitize(core);
+    eventLoop->mctx = mtcp_create_context(core);
+    // init epoll for mtcp
+    int mtcp_ep = mtcp_epoll_create(eventLoop->mctx, MTCP_MAX_EVENTS);
+    if (mtcp_ep < 0) {
+        mtcp_destroy_context(eventLoop->mctx);
+        return -1;
+    }
+    eventLoop->mtcp_ep =  mtcp_ep;
+    eventLoop->fired_numevents = 0;
+    /* init mtcp in aeApiState*/
+    aeApiState *state = eventLoop->apidata;
+    if (!state) return -1;
+    state->mctx = eventLoop->mctx;
+    state->mtcp_events = zmalloc(sizeof(struct epoll_event)*eventLoop->setsize);
+    return ret;
 }
 
 /* Return the current set size. */
@@ -152,6 +183,8 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
         eventLoop->maxfd = fd;
     return AE_OK;
 }
+
+
 
 void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
 {
@@ -355,6 +388,7 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
 int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 {
     int processed = 0, numevents;
+    int mtcp_numevents;
 
     /* Nothing to do? return ASAP */
     if (!(flags & AE_TIME_EVENTS) && !(flags & AE_FILE_EVENTS)) return 0;
@@ -406,6 +440,8 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         /* Call the multiplexing API, will return only on timeout or when
          * some event fires. */
         numevents = aeApiPoll(eventLoop, tvp);
+        mtcp_numevents = mtcp_aeApiPoll(eventLoop, tvp);
+        numevents += mtcp_numevents;
 
         /* After sleep callback. */
         if (eventLoop->aftersleep != NULL && flags & AE_CALL_AFTER_SLEEP)
@@ -510,3 +546,50 @@ void aeSetBeforeSleepProc(aeEventLoop *eventLoop, aeBeforeSleepProc *beforesleep
 void aeSetAfterSleepProc(aeEventLoop *eventLoop, aeBeforeSleepProc *aftersleep) {
     eventLoop->aftersleep = aftersleep;
 }
+
+/*********************************************************************************/
+int mtcp_aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
+        aeFileProc *proc, void *clientData)
+{
+    if (fd >= eventLoop->setsize) {
+        errno = ERANGE;
+        return AE_ERR;
+    }
+    aeFileEvent *fe = &eventLoop->events[fd];
+
+    if (mtcp_aeApiAddEvent(eventLoop, fd, mask) == -1)
+        return AE_ERR;
+    fe->mask |= mask;
+    if (mask & AE_READABLE) fe->rfileProc = proc;
+    if (mask & AE_WRITABLE) fe->wfileProc = proc;
+    fe->clientData = clientData;
+    if (fd > eventLoop->maxfd)
+        eventLoop->maxfd = fd;
+    return AE_OK;
+}
+
+void mtcp_aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
+{
+    if (fd >= eventLoop->setsize) return;
+    aeFileEvent *fe = &eventLoop->events[fd];
+    if (fe->mask == AE_NONE) return;
+
+    /* We want to always remove AE_BARRIER if set when AE_WRITABLE
+     * is removed. */
+    if (mask & AE_WRITABLE) mask |= AE_BARRIER;
+
+    mtcp_aeApiDelEvent(eventLoop, fd, mask);
+    fe->mask = fe->mask & (~mask);
+    if (fd == eventLoop->maxfd && fe->mask == AE_NONE) {
+        /* Update the max fd */
+        int j;
+
+        for (j = eventLoop->maxfd-1; j >= 0; j--)
+            if (eventLoop->events[j].mask != AE_NONE) break;
+        eventLoop->maxfd = j;
+    }
+}
+
+
+
+

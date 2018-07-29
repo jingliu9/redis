@@ -1725,22 +1725,24 @@ int listenToPort(int port, int *fds, int *count) {
             int unsupported = 0;
             /* Bind * for both IPv6 and IPv4, we enter here only if
              * server.bindaddr_count == 0. */
-            fds[*count] = anetTcp6Server(server.neterr,port,NULL,
-                server.tcp_backlog);
+            /**
+            fds[*count] = anetTcp6Server(server.neterr,port,NULL, server.tcp_backlog);
             if (fds[*count] != ANET_ERR) {
                 anetNonBlock(NULL,fds[*count]);
                 (*count)++;
             } else if (errno == EAFNOSUPPORT) {
                 unsupported++;
                 serverLog(LL_WARNING,"Not listening to IPv6: unsupproted");
-            }
+            }**/
+            // No support for IPv6
+            unsupported++;
 
             if (*count == 1 || unsupported) {
                 /* Bind the IPv4 address as well. */
-                fds[*count] = anetTcpServer(server.neterr,port,NULL,
+                fds[*count] = mtcp_anetTcpServer(server.el->mctx, server.neterr,port,NULL,
                     server.tcp_backlog);
                 if (fds[*count] != ANET_ERR) {
-                    anetNonBlock(NULL,fds[*count]);
+                    mtcp_anetNonBlock(server.el->mctx, NULL,fds[*count]);
                     (*count)++;
                 } else if (errno == EAFNOSUPPORT) {
                     unsupported++;
@@ -1753,12 +1755,10 @@ int listenToPort(int port, int *fds, int *count) {
             if (*count + unsupported == 2) break;
         } else if (strchr(server.bindaddr[j],':')) {
             /* Bind IPv6 address. */
-            fds[*count] = anetTcp6Server(server.neterr,port,server.bindaddr[j],
-                server.tcp_backlog);
+            //fds[*count] = anetTcp6Server(server.neterr,port,server.bindaddr[j], server.tcp_backlog);
         } else {
             /* Bind IPv4 address. */
-            fds[*count] = anetTcpServer(server.neterr,port,server.bindaddr[j],
-                server.tcp_backlog);
+            fds[*count] = mtcp_anetTcpServer(server.el->mctx, server.neterr,port,server.bindaddr[j],server.tcp_backlog);
         }
         if (fds[*count] == ANET_ERR) {
             serverLog(LL_WARNING,
@@ -1767,7 +1767,7 @@ int listenToPort(int port, int *fds, int *count) {
                 port, server.neterr);
             return C_ERR;
         }
-        anetNonBlock(NULL,fds[*count]);
+        mtcp_anetNonBlock(server.el->mctx, NULL,fds[*count]);
         (*count)++;
     }
     return C_OK;
@@ -1839,6 +1839,8 @@ void initServer(void) {
     createSharedObjects();
     adjustOpenFilesLimit();
     server.el = aeCreateEventLoop(server.maxclients+CONFIG_FDSET_INCR);
+    char mtcp_conf_name[] = "mtcp.conf";
+    aeInitMtcp(server.el, mtcp_conf_name);
     if (server.el == NULL) {
         serverLog(LL_WARNING,
             "Failed creating the event loop. Error message: '%s'",
@@ -1853,6 +1855,7 @@ void initServer(void) {
         exit(1);
 
     /* Open the listening Unix domain socket. */
+    // TODO: remove the UNIX socket?
     if (server.unixsocket != NULL) {
         unlink(server.unixsocket); /* don't care if this fails */
         server.sofd = anetUnixServer(server.neterr,server.unixsocket,
@@ -1924,7 +1927,7 @@ void initServer(void) {
     /* Create an event handler for accepting new connections in TCP and Unix
      * domain sockets. */
     for (j = 0; j < server.ipfd_count; j++) {
-        if (aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
+        if (mtcp_aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
             acceptTcpHandler,NULL) == AE_ERR)
             {
                 serverPanic(

@@ -1,0 +1,11 @@
+
+#ifndef _REDIS_MTCP_DEF_H_
+#define _REDIS_MTCP_DEF_H_
+
+#define MTCP_MAX_FLOW_NUM  (10000)
+#define MTCP_MAX_EVENTS (MTCP_MAX_FLOW_NUM * 3)
+#define MTCP_RCVBUF_SIZE (2*1024)
+#define MTCP_SNDBUF_SIZE (8*1024)
+
+#endif
+

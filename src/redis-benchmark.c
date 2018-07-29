@@ -46,7 +46,9 @@
 #include "adlist.h"
 #include "zmalloc.h"
 
+#ifndef UNUSED
 #define UNUSED(V) ((void) V)
+#endif
 #define RANDPTR_INITIAL_SIZE 8
 
 static struct config {
