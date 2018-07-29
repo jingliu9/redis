@@ -43,6 +43,7 @@
 #include "net.h"
 #include "sds.h"
 
+
 static redisReply *createReplyObject(int type);
 static void *createStringObject(const redisReadTask *task, char *str, size_t len);
 static void *createArrayObject(const redisReadTask *task, int elements);
@@ -616,8 +617,13 @@ static redisContext *redisContextInit(void) {
 void redisFree(redisContext *c) {
     if (c == NULL)
         return;
-    if (c->fd > 0)
-        close(c->fd);
+    if (c->fd > 0){
+        if(c->mctx){
+            mtcp_close(c->mctx,c->fd);
+        }else{
+            close(c->fd);
+        }
+    }
     if (c->obuf != NULL)
         sdsfree(c->obuf);
     if (c->reader != NULL)
@@ -645,7 +651,11 @@ int redisReconnect(redisContext *c) {
     memset(c->errstr, '\0', strlen(c->errstr));
 
     if (c->fd > 0) {
-        close(c->fd);
+        if(c->mctx){
+            mtcp_close(c->mctx,c->fd);
+        }else{
+            close(c->fd);
+        }
     }
 
     sdsfree(c->obuf);
@@ -695,7 +705,7 @@ redisContext *redisConnectWithTimeout(const char *ip, int port, const struct tim
     return c;
 }
 
-redisContext *redisConnectNonBlock(const char *ip, int port) {
+redisContext *redisConnectNonBlock( const char *ip, int port) {
     redisContext *c;
 
     c = redisContextInit();
@@ -718,6 +728,64 @@ redisContext *redisConnectBindNonBlock(const char *ip, int port,
 redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port,
                                                 const char *source_addr) {
     redisContext *c = redisContextInit();
+    c->flags &= ~REDIS_BLOCK;
+    c->flags |= REDIS_REUSEADDR;
+    redisContextConnectBindTcp(c,ip,port,NULL,source_addr);
+    return c;
+}
+
+redisContext *mtcp_redisConnect(mctx_t mctx, const char *ip, int port) {
+    redisContext *c;
+
+    c = redisContextInit();
+    if (c == NULL)
+        return NULL;
+    c->mctx = mctx;
+
+    c->flags |= REDIS_BLOCK;
+    redisContextConnectTcp(c,ip,port,NULL);
+    return c;
+}
+
+redisContext *mtcp_redisConnectWithTimeout(mctx_t mctx, const char *ip, int port, const struct timeval tv) {
+    redisContext *c;
+
+    c = redisContextInit();
+    if (c == NULL)
+        return NULL;
+    c->mctx = mctx;
+
+    c->flags |= REDIS_BLOCK;
+    redisContextConnectTcp(c,ip,port,&tv);
+    return c;
+}
+
+redisContext *mtcp_redisConnectNonBlock(mctx_t mctx, const char *ip, int port) {
+    redisContext *c;
+
+    c = redisContextInit();
+    if (c == NULL)
+        return NULL;
+    c->mctx = mctx;
+
+    c->flags &= ~REDIS_BLOCK;
+    redisContextConnectTcp(c,ip,port,NULL);
+    return c;
+}
+
+redisContext *mtcp_redisConnectBindNonBlock(mctx_t mctx, const char *ip, int port,
+                                       const char *source_addr) {
+    redisContext *c = redisContextInit();
+    c->mctx = mctx;
+    c->flags &= ~REDIS_BLOCK;
+    redisContextConnectBindTcp(c,ip,port,NULL,source_addr);
+    return c;
+}
+
+redisContext *mtcp_redisConnectBindNonBlockWithReuse(mctx_t mctx, const char *ip, int port,
+                                                const char *source_addr) {
+    redisContext *c = redisContextInit();
+    c->mctx = mctx;
     c->flags &= ~REDIS_BLOCK;
     c->flags |= REDIS_REUSEADDR;
     redisContextConnectBindTcp(c,ip,port,NULL,source_addr);
@@ -798,8 +866,10 @@ int redisBufferRead(redisContext *c) {
     /* Return early when the context has seen an error. */
     if (c->err)
         return REDIS_ERR;
-
-    nread = read(c->fd,buf,sizeof(buf));
+    if(!c->mctx){
+        printf("WARNING: redisBufferRead no mtcx\n");
+    }
+    nread = mtcp_read(c->mctx,c->fd,buf,sizeof(buf));
     if (nread == -1) {
         if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
@@ -831,12 +901,16 @@ int redisBufferRead(redisContext *c) {
 int redisBufferWrite(redisContext *c, int *done) {
     int nwritten;
 
+    printf("WARNING: redisBufferWrite called\n");
     /* Return early when the context has seen an error. */
     if (c->err)
         return REDIS_ERR;
 
+    if(!c->mctx){
+        printf("WARNING: redisBufferWrite c->mctx is NULL\n");
+    }
     if (sdslen(c->obuf) > 0) {
-        nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
+        nwritten = mtcp_write(c->mctx,c->fd,c->obuf,sdslen(c->obuf));
         if (nwritten == -1) {
             if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
                 /* Try again later */
@@ -1019,3 +1093,7 @@ void *redisCommandArgv(redisContext *c, int argc, const char **argv, const size_
         return NULL;
     return __redisBlockForReply(c);
 }
+
+
+/*******/
+

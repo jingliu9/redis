@@ -33,11 +33,13 @@
 
 #ifndef __HIREDIS_H
 #define __HIREDIS_H
+
 #include "read.h"
 #include <stdarg.h> /* for va_list */
 #include <sys/time.h> /* for struct timeval */
 #include <stdint.h> /* uintXX_t, etc */
 #include "sds.h" /* for sds */
+#include <mtcp_api.h>
 
 #define HIREDIS_MAJOR 0
 #define HIREDIS_MINOR 13
@@ -157,20 +159,28 @@ typedef struct redisContext {
     struct {
         char *path;
     } unix_sock;
-
+    
+    mctx_t mctx;
 } redisContext;
 
 redisContext *redisConnect(const char *ip, int port);
 redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv);
 redisContext *redisConnectNonBlock(const char *ip, int port);
-redisContext *redisConnectBindNonBlock(const char *ip, int port,
-                                       const char *source_addr);
+redisContext *redisConnectBindNonBlock(const char *ip, int port, const char *source_addr);
 redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port,
                                                 const char *source_addr);
+
 redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
 redisContext *redisConnectFd(int fd);
+
+redisContext *mtcp_redisConnect(mctx_t mctx, const char *ip, int port);
+redisContext *mtcp_redisConnectWithTimeout(mctx_t mctx, const char *ip, int port, const struct timeval tv);
+redisContext *mtcp_redisConnectNonBlock(mctx_t mtcx,const char *ip, int port);
+redisContext *mtcp_redisConnectBindNonBlock(mctx_t mctx, const char *ip, int port, const char *source_addr);
+redisContext *mtcp_redisConnectBindNonBlockWithReuse(mctx_t mctx, const char *ip, int port,
+                                                const char *source_addr);
 
 /**
  * Reconnect the given context using the saved information.

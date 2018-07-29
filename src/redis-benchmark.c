@@ -46,6 +46,11 @@
 #include "adlist.h"
 #include "zmalloc.h"
 
+#include <mtcp_api.h>
+
+
+mctx_t global_mctx = NULL;
+
 #ifndef UNUSED
 #define UNUSED(V) ((void) V)
 #endif
@@ -126,8 +131,10 @@ static long long mstime(void) {
 
 static void freeClient(client c) {
     listNode *ln;
-    aeDeleteFileEvent(config.el,c->context->fd,AE_WRITABLE);
-    aeDeleteFileEvent(config.el,c->context->fd,AE_READABLE);
+    //aeDeleteFileEvent(config.el,c->context->fd,AE_WRITABLE);
+    //aeDeleteFileEvent(config.el,c->context->fd,AE_READABLE);
+    mtcp_aeDeleteFileEvent(config.el,c->context->fd,AE_WRITABLE);
+    mtcp_aeDeleteFileEvent(config.el,c->context->fd,AE_READABLE);
     redisFree(c->context);
     sdsfree(c->obuf);
     zfree(c->randptr);
@@ -279,7 +286,7 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
 
     if (sdslen(c->obuf) > c->written) {
         void *ptr = c->obuf+c->written;
-        ssize_t nwritten = write(c->context->fd,ptr,sdslen(c->obuf)-c->written);
+        ssize_t nwritten = mtcp_write(c->context->mctx,c->context->fd,ptr,sdslen(c->obuf)-c->written);
         if (nwritten == -1) {
             if (errno != EPIPE)
                 fprintf(stderr, "Writing to socket: %s\n", strerror(errno));
@@ -320,7 +327,7 @@ static client createClient(char *cmd, size_t len, client from) {
     client c = zmalloc(sizeof(struct _client));
 
     if (config.hostsocket == NULL) {
-        c->context = redisConnectNonBlock(config.hostip,config.hostport);
+        c->context = mtcp_redisConnectNonBlock(config.el->mctx,config.hostip,config.hostport);
     } else {
         c->context = redisConnectUnixNonBlock(config.hostsocket);
     }
@@ -334,6 +341,9 @@ static client createClient(char *cmd, size_t len, client from) {
     }
     /* Suppress hiredis cleanup of unused buffers for max speed. */
     c->context->reader->maxbuf = 0;
+
+    /* assign mctx */
+    //c->context->mctx = config.el->mctx;
 
     /* Build the request buffer:
      * Queue N requests accordingly to the pipeline size, or simply clone
@@ -406,7 +416,7 @@ static client createClient(char *cmd, size_t len, client from) {
         }
     }
     if (config.idlemode == 0)
-        aeCreateFileEvent(config.el,c->context->fd,AE_WRITABLE,writeHandler,c);
+        mtcp_aeCreateFileEvent(config.el,c->context->fd,AE_WRITABLE,writeHandler,c);
     listAddNodeTail(config.clients,c);
     config.liveclients++;
     return c;
@@ -653,6 +663,7 @@ int main(int argc, const char **argv) {
     int len;
 
     client c;
+    char mtcp_conf_name[] = "mtcp.conf";
 
     srandom(time(NULL));
     signal(SIGHUP, SIG_IGN);
@@ -663,6 +674,10 @@ int main(int argc, const char **argv) {
     config.liveclients = 0;
     config.el = aeCreateEventLoop(1024*10);
     aeCreateTimeEvent(config.el,1,showThroughput,NULL,NULL);
+    /* init mtcp env*/
+    aeInitMtcp(config.el, mtcp_conf_name);
+    global_mctx = config.el->mctx;
+    /****************/
     config.keepalive = 1;
     config.datasize = 3;
     config.pipeline = 1;

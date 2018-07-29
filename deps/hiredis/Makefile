@@ -5,7 +5,7 @@
 
 OBJ=net.o hiredis.o sds.o async.o read.o
 EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib
-TESTS=hiredis-test
+#TESTS=hiredis-test
 LIBNAME=libhiredis
 PKGCONFNAME=hiredis.pc
 
@@ -22,6 +22,18 @@ PKGCONF_PATH?=pkgconfig
 INSTALL_INCLUDE_PATH= $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)
 INSTALL_LIBRARY_PATH= $(DESTDIR)$(PREFIX)/$(LIBRARY_PATH)
 INSTALL_PKGCONF_PATH= $(INSTALL_LIBRARY_PATH)/$(PKGCONF_PATH)
+
+DPDK_HOME=${HOME}/mtcp/dpdk/
+DPDK_INC=$(DPDK_HOME)/include
+DPDK_LIB=$(DPDK_HOME)/lib/
+DPDK_MACHINE_FLAGS = $(shell cat ${HOME}/mtcp/dpdk/include/cflags.txt)
+DPDK_LIB_FLAGS = $(shell cat ${HOME}/mtcp/dpdk/lib/ldflags.txt) -lgmp
+
+
+MTCP_FLD    =${HOME}/mtcp/mtcp/
+MTCP_INC    =-I$(MTCP_FLD)/include
+MTCP_LIB    =-L$(MTCP_FLD)/lib
+MTCP_TARGET = $(MTCP_LIB)/lib/libmtcp.a
 
 # redis-server configuration used for testing
 REDIS_PORT=56379
@@ -42,7 +54,10 @@ OPTIMIZATION?=-O3
 WARNINGS=-Wall -W -Wstrict-prototypes -Wwrite-strings
 DEBUG_FLAGS?= -g -ggdb
 REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CFLAGS) $(WARNINGS) $(DEBUG_FLAGS) $(ARCH)
+REAL_CFLAGS += $(MTCP_INC) $(DPDK_MACHINE_FLAGS) -I$(DPDK_INC) -include $(DPDK_INC)/rte_config.h
 REAL_LDFLAGS=$(LDFLAGS) $(ARCH)
+REAL_LDFLAGS += -pthread -lrt -march=native -export-dynamic $(MTCP_FLD)/lib/libmtcp.a $(MTCP_LIB) -L$(DPDK_HOME)/lib -lnuma -lmtcp -lpthread -lrt -ldl $(DPDK_LIB_FLAGS)
+
 
 DYLIBSUFFIX=so
 STLIBSUFFIX=a
@@ -66,7 +81,8 @@ ifeq ($(uname_S),Darwin)
   DYLIB_MAKE_CMD=$(CC) -shared -Wl,-install_name,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(LDFLAGS)
 endif
 
-all: $(DYLIBNAME) $(STLIBNAME) hiredis-test $(PKGCONFNAME)
+#all: $(DYLIBNAME) $(STLIBNAME) hiredis-test $(PKGCONFNAME)
+all: $(DYLIBNAME) $(STLIBNAME)  $(PKGCONFNAME)
 
 # Deps (use make dep to generate this)
 async.o: async.c fmacros.h async.h hiredis.h read.h sds.h net.h dict.c dict.h
@@ -75,7 +91,7 @@ hiredis.o: hiredis.c fmacros.h hiredis.h read.h sds.h net.h
 net.o: net.c fmacros.h net.h hiredis.h read.h sds.h
 read.o: read.c fmacros.h read.h sds.h
 sds.o: sds.c sds.h
-test.o: test.c fmacros.h hiredis.h read.h sds.h
+#test.o: test.c fmacros.h hiredis.h read.h sds.h
 
 $(DYLIBNAME): $(OBJ)
 	$(DYLIB_MAKE_CMD) $(OBJ)
@@ -138,25 +154,26 @@ hiredis-example: examples/example.c $(STLIBNAME)
 
 examples: $(EXAMPLES)
 
-hiredis-test: test.o $(STLIBNAME)
+#hiredis-test: test.o $(STLIBNAME)
 
 hiredis-%: %.o $(STLIBNAME)
 	$(CC) $(REAL_CFLAGS) -o $@ $(REAL_LDFLAGS) $< $(STLIBNAME)
 
-test: hiredis-test
-	./hiredis-test
+#test: hiredis-test
+#	./hiredis-est
 
-check: hiredis-test
-	@echo "$$REDIS_TEST_CONFIG" | $(REDIS_SERVER) -
-	$(PRE) ./hiredis-test -h 127.0.0.1 -p $(REDIS_PORT) -s /tmp/hiredis-test-redis.sock || \
-			( kill `cat /tmp/hiredis-test-redis.pid` && false )
-	kill `cat /tmp/hiredis-test-redis.pid`
+#check: hiredis-test
+#	@echo "$$REDIS_TEST_CONFIG" | $(REDIS_SERVER) -
+#	$(PRE) ./hiredis-test -h 127.0.0.1 -p $(REDIS_PORT) -s /tmp/hiredis-test-redis.sock || \
+#			( kill `cat /tmp/hiredis-test-redis.pid` && false )
+#	kill `cat /tmp/hiredis-test-redis.pid`
 
 .c.o:
 	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $<
 
 clean:
-	rm -rf $(DYLIBNAME) $(STLIBNAME) $(TESTS) $(PKGCONFNAME) examples/hiredis-example* *.o *.gcda *.gcno *.gcov
+	rm -rf $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME) examples/hiredis-example* *.o *.gcda *.gcno *.gcov
+	#rm -rf $(DYLIBNAME) $(STLIBNAME) $(TESTS) $(PKGCONFNAME) examples/hiredis-example* *.o *.gcda *.gcno *.gcov
 
 dep:
 	$(CC) -MM *.c

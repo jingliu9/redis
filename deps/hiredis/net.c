@@ -53,6 +53,7 @@
 
 #include "net.h"
 #include "sds.h"
+#include <mtcp_api.h>
 
 /* Defined in hiredis.c */
 void __redisSetError(redisContext *c, int type, const char *str);
@@ -101,10 +102,22 @@ static int redisCreateSocket(redisContext *c, int type) {
 
 static int redisSetBlocking(redisContext *c, int blocking) {
     int flags;
+    UNUSED(flags);
 
     /* Set the socket nonblocking.
      * Note that fcntl(2) for F_GETFL and F_SETFL can't be
      * interrupted by a signal. */
+    if(!c->mctx){
+        printf("WARING: c->mctx is NULL\n");
+    }
+
+    if (blocking){
+        return REDIS_OK;
+    }else{
+        return mtcp_setsock_nonblock(c->mctx, c->fd);
+    }
+
+#if 0
     if ((flags = fcntl(c->fd, F_GETFL)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"fcntl(F_GETFL)");
         redisContextCloseFd(c);
@@ -121,6 +134,7 @@ static int redisSetBlocking(redisContext *c, int blocking) {
         redisContextCloseFd(c);
         return REDIS_ERR;
     }
+#endif
     return REDIS_OK;
 }
 
@@ -168,10 +182,19 @@ int redisKeepAlive(redisContext *c, int interval) {
 
 static int redisSetTcpNoDelay(redisContext *c) {
     int yes = 1;
-    if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(TCP_NODELAY)");
-        redisContextCloseFd(c);
-        return REDIS_ERR;
+    if(c->mctx){
+        if (mtcp_setsockopt(c->mctx,c->fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1) {
+            __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(TCP_NODELAY)");
+            redisContextCloseFd(c);
+            return REDIS_ERR;
+        }
+    }else{
+        printf("WARNING: redisSetTcpNoDelay c->mctx is NULL\n");
+        if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1) {
+            __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(TCP_NODELAY)");
+            redisContextCloseFd(c);
+            return REDIS_ERR;
+        }
     }
     return REDIS_OK;
 }
@@ -277,6 +300,11 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     c->connection_type = REDIS_CONN_TCP;
     c->tcp.port = port;
 
+    if(!c->mctx){
+        printf("WARNING: _redisContextConnectTcp no mctx\n");
+        return -1;
+    }
+
     /* We need to take possession of the passed parameters
      * to make them reusable for a reconnect.
      * We also carefully check we don't free data we already own,
@@ -336,7 +364,7 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
 addrretry:
-        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        if ((s = mtcp_socket(c->mctx, p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
             continue;
 
         c->fd = s;
@@ -354,14 +382,14 @@ addrretry:
 
             if (reuseaddr) {
                 n = 1;
-                if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char*) &n,
+                if (mtcp_setsockopt(c->mctx,s, SOL_SOCKET, SO_REUSEADDR, (char*) &n,
                                sizeof(n)) < 0) {
                     goto error;
                 }
             }
 
             for (b = bservinfo; b != NULL; b = b->ai_next) {
-                if (bind(s,b->ai_addr,b->ai_addrlen) != -1) {
+                if (mtcp_bind(c->mctx,s,b->ai_addr,b->ai_addrlen) != -1) {
                     bound = 1;
                     break;
                 }
@@ -374,7 +402,7 @@ addrretry:
                 goto error;
             }
         }
-        if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
+        if (mtcp_connect(c->mctx,s,p->ai_addr,p->ai_addrlen) == -1) {
             if (errno == EHOSTUNREACH) {
                 redisContextCloseFd(c);
                 continue;
