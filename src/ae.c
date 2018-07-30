@@ -46,6 +46,14 @@
 
 #include "mtcp_def.h"
 
+//#define _MEASURE_REDIS_WAIT_
+static inline uint64_t jl_rdtsc(void)
+{
+    uint64_t eax, edx;
+    __asm volatile ("rdtsc" : "=a" (eax), "=d" (edx));
+    return (edx << 32) | eax;
+}
+
 /* Include the best multiplexing layer supported by this system.
  * The following should be ordered by performances, descending. */
 #ifdef HAVE_EVPORT
@@ -454,7 +462,16 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
          * some event fires. */
         //posix_numevents = aeApiPoll(eventLoop, tvp);
         posix_numevents = 0;
+#ifdef _MEASURE_REDIS_WAIT_
+        uint64_t wait_start_tick = jl_rdtsc();
+#endif
         mtcp_numevents = mtcp_aeApiPoll(eventLoop, tvp);
+#ifdef _MEASURE_REDIS_WAIT_
+        uint64_t wait_end_tick = jl_rdtsc();
+        if(mtcp_numevents > 0){
+            fprintf(stderr, "mtcp_aeApiPoll() total_time_ticks:%lu\n", (wait_end_tick - wait_start_tick));
+        }
+#endif
 #if 0
         // DEBUG
         if(posix_numevents > 0 || mtcp_numevents > 0){

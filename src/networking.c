@@ -34,6 +34,14 @@
 #include <ctype.h>
 #include <mtcp_api.h>
 
+//#define _MEASURE_REDIS_LOGIC_
+static inline uint64_t jl_rdtsc(void)
+{
+    uint64_t eax, edx;
+    __asm volatile ("rdtsc" : "=a" (eax), "=d" (edx));
+    return (edx << 32) | eax;
+}
+
 static void setProtocolError(const char *errstr, client *c, long pos);
 
 /* Return the size consumed from the allocator, for the specified SDS string,
@@ -1425,6 +1433,10 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
                                         c->querybuf+qblen,nread);
     }
 
+#ifdef _MEASURE_REDIS_LOGIC_
+    uint64_t start_process_tick = jl_rdtsc();
+#endif
+
     sdsIncrLen(c->querybuf,nread);
     c->lastinteraction = server.unixtime;
     if (c->flags & CLIENT_MASTER) c->read_reploff += nread;
@@ -1458,6 +1470,10 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
             sdsrange(c->pending_querybuf,applied,-1);
         }
     }
+#ifdef _MEASURE_REDIS_LOGIC_
+    uint64_t end_process_tick = jl_rdtsc();
+    fprintf(stderr, "redis-logic total_time_ticks:%lu\n", (end_process_tick - start_process_tick));
+#endif
 }
 
 void getClientsMaxBuffers(unsigned long *longest_output_list,
