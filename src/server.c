@@ -1219,7 +1219,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
 
     /* Check if there are clients unblocked by modules that implement
      * blocking commands. */
-    moduleHandleBlockedClients();
+    //moduleHandleBlockedClients();
 
     /* Try to process pending commands for clients that were just unblocked. */
     if (listLength(server.unblocked_clients))
@@ -1234,7 +1234,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
     /* Before we are going to sleep, let the threads access the dataset by
      * releasing the GIL. Redis main thread will not touch anything at this
      * time. */
-    if (moduleCount()) moduleReleaseGIL();
+    //if (moduleCount()) moduleReleaseGIL();
 }
 
 /* This function is called immadiately after the event loop multiplexing
@@ -1242,7 +1242,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
  * the different events callbacks. */
 void afterSleep(struct aeEventLoop *eventLoop) {
     UNUSED(eventLoop);
-    if (moduleCount()) moduleAcquireGIL();
+    //if (moduleCount()) moduleAcquireGIL();
 }
 
 /* =========================== Server initialization ======================== */
@@ -3747,7 +3747,7 @@ int main(int argc, char **argv) {
     dictSetHashFunctionSeed((uint8_t*)hashseed);
     server.sentinel_mode = checkForSentinelMode(argc,argv);
     initServerConfig();
-    moduleInitModulesSystem();
+    //moduleInitModulesSystem();
 
     /* Store the executable path and arguments in a safe place in order
      * to be able to restart the server later. */
@@ -3869,7 +3869,7 @@ int main(int argc, char **argv) {
     #ifdef __linux__
         linuxMemoryWarnings();
     #endif
-        moduleLoadFromQueue();
+        //moduleLoadFromQueue();
         loadDataFromDisk();
         if (server.cluster_enabled) {
             if (verifyClusterConfigWithData() == C_ERR) {
