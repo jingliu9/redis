@@ -156,9 +156,9 @@ static void freeAllClients(void) {
 }
 
 static void resetClient(client c) {
-    aeDeleteFileEvent(config.el,c->context->fd,AE_WRITABLE);
-    aeDeleteFileEvent(config.el,c->context->fd,AE_READABLE);
-    aeCreateFileEvent(config.el,c->context->fd,AE_WRITABLE,writeHandler,c);
+    mtcp_aeDeleteFileEvent(config.el,c->context->fd,AE_WRITABLE);
+    mtcp_aeDeleteFileEvent(config.el,c->context->fd,AE_READABLE);
+    mtcp_aeCreateFileEvent(config.el,c->context->fd,AE_WRITABLE,writeHandler,c);
     c->written = 0;
     c->pending = config.pipeline;
 }
@@ -201,6 +201,7 @@ static void readHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(fd);
     UNUSED(mask);
+    printf("redis-benchmark.c/readHandler");
 
     /* Calculate latency only for the first read event. This means that the
      * server already sent the reply and we need to parse it. Parsing overhead
@@ -295,8 +296,8 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
         }
         c->written += nwritten;
         if (sdslen(c->obuf) == c->written) {
-            aeDeleteFileEvent(config.el,c->context->fd,AE_WRITABLE);
-            aeCreateFileEvent(config.el,c->context->fd,AE_READABLE,readHandler,c);
+            mtcp_aeDeleteFileEvent(config.el,c->context->fd,AE_WRITABLE);
+            mtcp_aeCreateFileEvent(config.el,c->context->fd,AE_READABLE,readHandler,c);
         }
     }
 }
