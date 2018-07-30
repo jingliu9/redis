@@ -32,8 +32,18 @@
 #include <sys/uio.h>
 #include <math.h>
 #include <ctype.h>
+#include <sys/time.h>
+#include "../measure.h"
 
 static void setProtocolError(const char *errstr, client *c, long pos);
+
+static inline uint64_t rdtsc(void)
+{
+    uint64_t eax, edx;
+    __asm volatile ("rdtsc" : "=a" (eax), "=d" (edx));
+    return (edx << 32) | eax;
+}
+
 
 /* Return the size consumed from the allocator, for the specified SDS string,
  * including internal fragmentation. This function is used in order to compute
@@ -921,7 +931,15 @@ int writeToClient(int fd, client *c, int handler_installed) {
             sga.bufs[0].len = c->bufpos-c->sentlen;
             if(REDIS_ZEUS_DEBUG) printf("before zeus_push\n");
             //nwritten = zeus_push(fd, &sga);
+#ifdef _LIBOS_MEASURE_REDIS_NETWORKING_PUSH_ID_
+            uint64_t rcd_start, rcd_end;
+            rcd_start = rdtsc();
+#endif
             npush = zeus_push(fd, &sga);
+#ifdef _LIBOS_MEASURE_REDIS_NETWORKING_PUSH_ID_
+            rcd_end = rdtsc();
+            printf("mpoint:%d time_tick:%lu\n", (_LIBOS_MEASURE_REDIS_NETWORKING_PUSH_ID_), (rcd_end - rcd_start));
+#endif
             if(npush == 0){
                 // push success
                 nwritten = sga.bufs[0].len;
@@ -1422,6 +1440,10 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(mask);
     UNUSED(nwait);
 
+#ifdef _LIBOS_MEASURE_REDIS_APP_LOGIC_
+    uint64_t init_tick = rdtsc();
+#endif
+
     //if(REDIS_ZEUS_DEBUG) printf("networking.c/readQueryFromClient fd:%d\n", fd);
 
     readlen = PROTO_IOBUF_LEN;
@@ -1442,6 +1464,9 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     qblen = sdslen(c->querybuf);
     if (c->querybuf_peak < qblen) c->querybuf_peak = qblen;
     c->querybuf = sdsMakeRoomFor(c->querybuf, readlen);
+#ifdef _LIBOS_MEASURE_REDIS_APP_LOGIC_
+    uint64_t make_room_tick = rdtsc();
+#endif
     //printf("netoworking.c@@@@@@readQueryFromClient/read(%d)\n", fd);
     //nread = read(fd, c->querybuf+qblen, readlen);
     zeus_sgarray sga;
@@ -1461,8 +1486,19 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     //printf("@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
     **/
 
+#ifdef _LIBOS_MEASURE_REDIS_NETWORKING_POP_ID_
+    uint64_t rcd_start, rcd_end;
+    rcd_start = rdtsc();
+#endif
     // use light_pop
     npop = zeus_light_pop(fd, &sga);
+
+#ifdef _LIBOS_MEASURE_REDIS_NETWORKING_POP_ID_
+    rcd_end = rdtsc();
+    if(npop > 0){
+        fprintf(stderr,"mpoint:%d time_tick:%lu\n", (_LIBOS_MEASURE_REDIS_NETWORKING_POP_ID_), (rcd_end - rcd_start));
+    }
+#endif
     if(npop <= 0){
         // make sure handled as EAGAIN
         nread = -1;
@@ -1476,6 +1512,10 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
         npop = 0;
     }
 
+
+#ifdef _LIBOS_MEASURE_REDIS_APP_LOGIC_
+    uint64_t start_process_tick = rdtsc();
+#endif
     char *ptr = (char*)(sga.bufs[0].buf);
     if (npop > 0 || npop == C_ZEUS_IO_ERR_NO) {
         // regard as EAGAIN
@@ -1538,6 +1578,13 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
             sdsrange(c->pending_querybuf,applied,-1);
         }
     }
+
+#ifdef _LIBOS_MEASURE_REDIS_APP_LOGIC_
+    uint64_t end_process_tick = rdtsc();
+    uint64_t make_room_overhead = make_room_tick - init_tick;
+    printf("overhead_prior:%lu time_tick_for_req(Process):%lu\n", 
+            make_room_overhead, make_room_overhead + (end_process_tick - start_process_tick));
+#endif
 }
 
 void getClientsMaxBuffers(unsigned long *longest_output_list,
