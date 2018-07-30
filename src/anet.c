@@ -259,7 +259,7 @@ static int anetSetReuseAddr(char *err, int fd) {
 static int anetCreateSocket(char *err, int domain) {
     int s;
     //if ((s = socket(domain, SOCK_STREAM, 0)) == -1) {
-    if ((s = zeus_queue(domain, SOCK_DGRAM, 0)) == -1) {
+    if ((s = zeus_socket(domain, SOCK_DGRAM, 0)) == -1) {
         anetSetError(err, "creating socket: %s", strerror(errno));
         return ANET_ERR;
     }
@@ -299,7 +299,7 @@ static int anetTcpGenericConnect(char *err, char *addr, int port,
          * If we fail in the socket() call, or on connect(), we retry with
          * the next entry in servinfo. */
         //if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
-        if ((s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        if ((s = zeus_socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
             continue;
         if (anetSetReuseAddr(err,s) == ANET_ERR) goto error;
         if (flags & ANET_CONNECT_NONBLOCK && anetNonBlock(err,s) != ANET_OK)
@@ -503,8 +503,8 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
         //if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
-        if ((s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1) {
-            perror("zeus_queue returned -1");
+        if ((s = zeus_socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1) {
+            perror("zeus_socket returned -1");
         	continue;
         }
 

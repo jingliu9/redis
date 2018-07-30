@@ -89,7 +89,7 @@ static int redisSetReuseAddr(redisContext *c) {
 static int redisCreateSocket(redisContext *c, int type) {
     int s;
     //if ((s = socket(type, SOCK_STREAM, 0)) == -1) {
-    if ((s = zeus_queue(type, SOCK_DGRAM, 0)) == -1) {
+    if ((s = zeus_socket(type, SOCK_DGRAM, 0)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
         return REDIS_ERR;
     }
@@ -345,7 +345,7 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     for (p = servinfo; p != NULL; p = p->ai_next) {
 addrretry:
         //if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
-        if ((s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        if ((s = zeus_socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
             continue;
 
         c->fd = s;
