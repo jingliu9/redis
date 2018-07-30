@@ -70,6 +70,7 @@ int listMatchObjects(void *a, void *b) {
 
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
+    printf("networking.c/createClient(%d)\n", fd);
 
     /* passing -1 as fd it is possible to create a non connected client.
      * This is useful since all the commands needs to be executed
@@ -138,6 +139,7 @@ client *createClient(int fd) {
     listSetMatchMethod(c->pubsub_patterns,listMatchObjects);
     if (fd != -1) listAddNodeTail(server.clients,c);
     initClientMultiState(c);
+    printf("createClient success\n");
     return c;
 }
 
@@ -611,11 +613,12 @@ int clientHasPendingReplies(client *c) {
 #define MAX_ACCEPTS_PER_CALL 1000
 static void acceptCommonHandler(int fd, int flags, char *ip) {
     client *c;
+    printf("acceptCommandHandler\n");
     if ((c = createClient(fd)) == NULL) {
         serverLog(LL_WARNING,
             "Error registering fd event for the new client: %s (fd=%d)",
             strerror(errno),fd);
-        close(fd); /* May be already closed, just ignore errors */
+        mtcp_close(server.el->mctx, fd); /* May be already closed, just ignore errors */
         return;
     }
     /* If maxclient directive is set and this is one client more... close the
@@ -679,6 +682,7 @@ static void acceptCommonHandler(int fd, int flags, char *ip) {
 
     server.stat_numconnections++;
     c->flags |= flags;
+    printf("acceptCommandler finished\n");
 }
 
 void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
@@ -687,9 +691,11 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
     UNUSED(privdata);
+    printf("acceptTcpHandler\n");
 
     while(max--) {
         cfd = mtcp_anetTcpAccept(server.el->mctx, server.neterr, fd, cip, sizeof(cip), &cport);
+        printf("cfd in tcpAccept:%d\n", cfd);
         if (cfd == ANET_ERR) {
             if (errno != EWOULDBLOCK)
                 serverLog(LL_WARNING,

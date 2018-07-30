@@ -147,14 +147,15 @@ static char *aeApiName(void) {
 static int mtcp_aeApiAddEvent(aeEventLoop *eventLoop, int fd, int mask) {
     aeApiState *state = eventLoop->apidata;
     UNUSED(state);
+    printf("mtcp_aeApiAddEvent fd:%d\n", fd);
     struct mtcp_epoll_event ee = {0}; /* avoid valgrind warning */
     /* If the fd was already monitored for some event, we need a MOD
      * operation. Otherwise we need an ADD operation. */
-    int op = eventLoop->events[fd].mask == AE_NONE ?
+    int op = eventLoop->mtcp_events[fd].mask == AE_NONE ?
             EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 
     ee.events = 0;
-    mask |= eventLoop->events[fd].mask; /* Merge old events */
+    mask |= eventLoop->mtcp_events[fd].mask; /* Merge old events */
     if (mask & AE_READABLE) ee.events |= EPOLLIN;
     if (mask & AE_WRITABLE) ee.events |= EPOLLOUT;
     ee.data.sockid = fd;
@@ -166,7 +167,7 @@ static void mtcp_aeApiDelEvent(aeEventLoop *eventLoop, int fd, int delmask) {
     aeApiState *state = eventLoop->apidata;
     UNUSED(state);
     struct mtcp_epoll_event ee = {0}; /* avoid valgrind warning */
-    int mask = eventLoop->events[fd].mask & (~delmask);
+    int mask = eventLoop->mtcp_events[fd].mask & (~delmask);
 
     ee.events = 0;
     if (mask & AE_READABLE) ee.events |= EPOLLIN;
@@ -189,18 +190,20 @@ static int mtcp_aeApiPoll(aeEventLoop *eventLoop, struct timeval *tvp) {
             tvp ? (tvp->tv_sec*1000 + tvp->tv_usec/1000) : -1);
     if (retval > 0) {
         int j;
+        printf("mtcp_epoll_wait returns:%d\n", retval);
 
         numevents = retval;
         for (j = 0; j < numevents; j++) {
             int mask = 0;
-            struct mtcp_epoll_event *e = state->mtcp_events+(j+eventLoop->fired_numevents);
+            struct mtcp_epoll_event *e = state->mtcp_events+j;
 
             if (e->events & EPOLLIN) mask |= AE_READABLE;
             if (e->events & EPOLLOUT) mask |= AE_WRITABLE;
             if (e->events & EPOLLERR) mask |= AE_WRITABLE;
             if (e->events & EPOLLHUP) mask |= AE_WRITABLE;
-            eventLoop->fired[j].fd = e->data.sockid;
-            eventLoop->fired[j].mask = mask;
+            printf("eventLoop->fired[%d].sockid:%d\n", j, e->data.sockid);
+            eventLoop->mtcp_fired[j].fd = e->data.sockid;
+            eventLoop->mtcp_fired[j].mask = mask;
         }
     }
     return numevents;

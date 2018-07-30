@@ -669,6 +669,7 @@ int anetFormatSock(int fd, char *fmt, size_t fmt_len) {
 int mtcp_anetKeepAlive(mctx_t mctx, char *err, int fd, int interval)
 {
     int val = 1;
+    printf("mtcp_anetKeepAlive\n");
 
     if (mtcp_setsockopt(mctx, fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1)
     {
@@ -708,7 +709,7 @@ int mtcp_anetKeepAlive(mctx_t mctx, char *err, int fd, int interval)
 #else
     ((void) interval); /* Avoid unused var warning for non Linux systems. */
 #endif
-
+    printf("mtcp_anetKeepAlive success\n");
     return ANET_OK;
 }
 
@@ -736,7 +737,9 @@ static int mtcp_anetSetTcpNoDelay(mctx_t mctx, char *err, int fd, int val)
 
 int mtcp_anetEnableTcpNoDelay(mctx_t mctx, char *err, int fd)
 {
-    return mtcp_anetSetTcpNoDelay(mctx, err, fd, 1);
+    int ret =  mtcp_anetSetTcpNoDelay(mctx, err, fd, 1);
+    printf("mtcp_anetEnableTcpNoDelay: ret:%d\n", ret);
+    return ret;
 }
 
 int mtcp_anetDisableTcpNoDelay(mctx_t mctx, char *err, int fd)
@@ -836,6 +839,7 @@ int mtcp_anetTcpAccept(mctx_t mctx, char *err, int s, char *ip, size_t ip_len, i
     int fd;
     struct sockaddr_storage sa;
     socklen_t salen = sizeof(sa);
+    printf("mtcp_anetTcpAccept: fd:%d\n", s);
     if ((fd = mtcp_anetGenericAccept(mctx, err,s,(struct sockaddr*)&sa,&salen)) == -1)
         return ANET_ERR;
 
@@ -855,7 +859,9 @@ int mtcp_anetTcpAccept(mctx_t mctx, char *err, int s, char *ip, size_t ip_len, i
 
 int mtcp_anetNonBlock(mctx_t mctx, char *err, int fd) {
     UNUSED(err);
-    return mtcp_setsock_nonblock(mctx, fd);
+    int ret =  mtcp_setsock_nonblock(mctx, fd);
+    printf("mtcp_anetNonBlock ret:%d\n", ret);
+    return ret;
 }
 
 /***************************************************************/

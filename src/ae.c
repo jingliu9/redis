@@ -69,26 +69,34 @@ aeEventLoop *aeCreateEventLoop(int setsize) {
     if ((eventLoop = zmalloc(sizeof(*eventLoop))) == NULL) goto err;
     eventLoop->events = zmalloc(sizeof(aeFileEvent)*setsize);
     eventLoop->fired = zmalloc(sizeof(aeFiredEvent)*setsize);
+    eventLoop->mtcp_events = zmalloc(sizeof(aeFileEvent)*setsize);
+    eventLoop->mtcp_fired = zmalloc(sizeof(aeFiredEvent)*setsize);
     if (eventLoop->events == NULL || eventLoop->fired == NULL) goto err;
+    if (eventLoop->mtcp_events == NULL || eventLoop->mtcp_fired == NULL) goto err;
     eventLoop->setsize = setsize;
     eventLoop->lastTime = time(NULL);
     eventLoop->timeEventHead = NULL;
     eventLoop->timeEventNextId = 0;
     eventLoop->stop = 0;
     eventLoop->maxfd = -1;
+    eventLoop->mtcp_maxfd = -1;
     eventLoop->beforesleep = NULL;
     eventLoop->aftersleep = NULL;
     if (aeApiCreate(eventLoop) == -1) goto err;
     /* Events with mask == AE_NONE are not set. So let's initialize the
      * vector with it. */
-    for (i = 0; i < setsize; i++)
+    for (i = 0; i < setsize; i++) {
         eventLoop->events[i].mask = AE_NONE;
+        eventLoop->mtcp_events[i].mask = AE_NONE;
+    }
     return eventLoop;
 
 err:
     if (eventLoop) {
         zfree(eventLoop->events);
         zfree(eventLoop->fired);
+        zfree(eventLoop->mtcp_events);
+        zfree(eventLoop->mtcp_fired);
         zfree(eventLoop);
     }
     return NULL;
@@ -144,6 +152,9 @@ int aeResizeSetSize(aeEventLoop *eventLoop, int setsize) {
 
     eventLoop->events = zrealloc(eventLoop->events,sizeof(aeFileEvent)*setsize);
     eventLoop->fired = zrealloc(eventLoop->fired,sizeof(aeFiredEvent)*setsize);
+    eventLoop->mtcp_events = zrealloc(eventLoop->events,sizeof(aeFileEvent)*setsize);
+    eventLoop->mtcp_fired = zrealloc(eventLoop->fired,sizeof(aeFiredEvent)*setsize);
+
     eventLoop->setsize = setsize;
 
     /* Make sure that if we created new slots, they are initialized with
@@ -157,6 +168,8 @@ void aeDeleteEventLoop(aeEventLoop *eventLoop) {
     aeApiFree(eventLoop);
     zfree(eventLoop->events);
     zfree(eventLoop->fired);
+    zfree(eventLoop->mtcp_events);
+    zfree(eventLoop->mtcp_fired);
     zfree(eventLoop);
 }
 
@@ -388,7 +401,7 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
 int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 {
     int processed = 0, numevents;
-    int mtcp_numevents;
+    int mtcp_numevents, posix_numevents;
 
     /* Nothing to do? return ASAP */
     if (!(flags & AE_TIME_EVENTS) && !(flags & AE_FILE_EVENTS)) return 0;
@@ -397,7 +410,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
      * file events to process as long as we want to process time
      * events, in order to sleep until the next time event is ready
      * to fire. */
-    if (eventLoop->maxfd != -1 ||
+    if ((eventLoop->maxfd != -1 || eventLoop->mtcp_maxfd != -1) ||
         ((flags & AE_TIME_EVENTS) && !(flags & AE_DONT_WAIT))) {
         int j;
         aeTimeEvent *shortest = NULL;
@@ -439,19 +452,34 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 
         /* Call the multiplexing API, will return only on timeout or when
          * some event fires. */
-        numevents = aeApiPoll(eventLoop, tvp);
+        posix_numevents = aeApiPoll(eventLoop, tvp);
         mtcp_numevents = mtcp_aeApiPoll(eventLoop, tvp);
-        numevents += mtcp_numevents;
+        if(posix_numevents > 0 || mtcp_numevents > 0){
+            printf("posix_numevents:%d mtcp_numevents:%d\n", posix_numevents, mtcp_numevents);
+        }
+        numevents = posix_numevents + mtcp_numevents;
 
         /* After sleep callback. */
         if (eventLoop->aftersleep != NULL && flags & AE_CALL_AFTER_SLEEP)
             eventLoop->aftersleep(eventLoop);
 
+        int jj = 0;
         for (j = 0; j < numevents; j++) {
-            aeFileEvent *fe = &eventLoop->events[eventLoop->fired[j].fd];
-            int mask = eventLoop->fired[j].mask;
-            int fd = eventLoop->fired[j].fd;
+            aeFileEvent *fe;
+            int mask;
+            int fd;
             int fired = 0; /* Number of events fired for current fd. */
+
+            if(j < posix_numevents){
+                fe = &eventLoop->events[eventLoop->fired[j].fd];
+                mask = eventLoop->fired[j].mask;
+                fd = eventLoop->fired[j].fd;
+            }else{
+                fe = &eventLoop->mtcp_events[eventLoop->mtcp_fired[jj].fd];
+                mask = eventLoop->mtcp_fired[jj].mask;
+                fd = eventLoop->mtcp_fired[jj].fd;
+                jj++;
+            }
 
             /* Normally we execute the readable event first, and the writable
              * event laster. This is useful as sometimes we may be able
@@ -466,7 +494,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
              * before replying to a client. */
             int invert = fe->mask & AE_BARRIER;
 
-	    /* Note the "fe->mask & mask & ..." code: maybe an already
+	        /* Note the "fe->mask & mask & ..." code: maybe an already
              * processed event removed an element that fired and we still
              * didn't processed, so we check if the event is still valid.
              *
@@ -551,11 +579,12 @@ void aeSetAfterSleepProc(aeEventLoop *eventLoop, aeBeforeSleepProc *aftersleep) 
 int mtcp_aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
         aeFileProc *proc, void *clientData)
 {
+    printf("mtcp_aeCreateFileEvent fd:%d\n", fd);
     if (fd >= eventLoop->setsize) {
         errno = ERANGE;
         return AE_ERR;
     }
-    aeFileEvent *fe = &eventLoop->events[fd];
+    aeFileEvent *fe = &eventLoop->mtcp_events[fd];
 
     if (mtcp_aeApiAddEvent(eventLoop, fd, mask) == -1)
         return AE_ERR;
@@ -563,15 +592,16 @@ int mtcp_aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
     if (mask & AE_READABLE) fe->rfileProc = proc;
     if (mask & AE_WRITABLE) fe->wfileProc = proc;
     fe->clientData = clientData;
-    if (fd > eventLoop->maxfd)
-        eventLoop->maxfd = fd;
+    if (fd > eventLoop->mtcp_maxfd)
+        eventLoop->mtcp_maxfd = fd;
+    printf("mtcp_aeCreateFileEvent success\n");
     return AE_OK;
 }
 
 void mtcp_aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
 {
     if (fd >= eventLoop->setsize) return;
-    aeFileEvent *fe = &eventLoop->events[fd];
+    aeFileEvent *fe = &eventLoop->mtcp_events[fd];
     if (fe->mask == AE_NONE) return;
 
     /* We want to always remove AE_BARRIER if set when AE_WRITABLE
@@ -584,9 +614,9 @@ void mtcp_aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
         /* Update the max fd */
         int j;
 
-        for (j = eventLoop->maxfd-1; j >= 0; j--)
-            if (eventLoop->events[j].mask != AE_NONE) break;
-        eventLoop->maxfd = j;
+        for (j = eventLoop->mtcp_maxfd-1; j >= 0; j--)
+            if (eventLoop->mtcp_events[j].mask != AE_NONE) break;
+        eventLoop->mtcp_maxfd = j;
     }
 }
 
