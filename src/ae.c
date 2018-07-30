@@ -454,9 +454,12 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
          * some event fires. */
         posix_numevents = aeApiPoll(eventLoop, tvp);
         mtcp_numevents = mtcp_aeApiPoll(eventLoop, tvp);
+#if 0
+        // DEBUG
         if(posix_numevents > 0 || mtcp_numevents > 0){
             printf("posix_numevents:%d mtcp_numevents:%d\n", posix_numevents, mtcp_numevents);
         }
+#endif
         numevents = posix_numevents + mtcp_numevents;
 
         /* After sleep callback. */
@@ -579,7 +582,6 @@ void aeSetAfterSleepProc(aeEventLoop *eventLoop, aeBeforeSleepProc *aftersleep) 
 int mtcp_aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
         aeFileProc *proc, void *clientData)
 {
-    printf("mtcp_aeCreateFileEvent fd:%d\n", fd);
     if (fd >= eventLoop->setsize) {
         errno = ERANGE;
         return AE_ERR;
@@ -594,7 +596,6 @@ int mtcp_aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
     fe->clientData = clientData;
     if (fd > eventLoop->mtcp_maxfd)
         eventLoop->mtcp_maxfd = fd;
-    printf("mtcp_aeCreateFileEvent success\n");
     return AE_OK;
 }
 

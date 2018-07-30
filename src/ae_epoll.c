@@ -147,7 +147,6 @@ static char *aeApiName(void) {
 static int mtcp_aeApiAddEvent(aeEventLoop *eventLoop, int fd, int mask) {
     aeApiState *state = eventLoop->apidata;
     UNUSED(state);
-    printf("mtcp_aeApiAddEvent fd:%d\n", fd);
     struct mtcp_epoll_event ee = {0}; /* avoid valgrind warning */
     /* If the fd was already monitored for some event, we need a MOD
      * operation. Otherwise we need an ADD operation. */
@@ -190,7 +189,6 @@ static int mtcp_aeApiPoll(aeEventLoop *eventLoop, struct timeval *tvp) {
             tvp ? (tvp->tv_sec*1000 + tvp->tv_usec/1000) : -1);
     if (retval > 0) {
         int j;
-        printf("mtcp_epoll_wait returns:%d\n", retval);
 
         numevents = retval;
         for (j = 0; j < numevents; j++) {
@@ -201,7 +199,6 @@ static int mtcp_aeApiPoll(aeEventLoop *eventLoop, struct timeval *tvp) {
             if (e->events & EPOLLOUT) mask |= AE_WRITABLE;
             if (e->events & EPOLLERR) mask |= AE_WRITABLE;
             if (e->events & EPOLLHUP) mask |= AE_WRITABLE;
-            printf("eventLoop->fired[%d].sockid:%d\n", j, e->data.sockid);
             eventLoop->mtcp_fired[j].fd = e->data.sockid;
             eventLoop->mtcp_fired[j].mask = mask;
         }
