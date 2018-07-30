@@ -201,7 +201,6 @@ static void readHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(fd);
     UNUSED(mask);
-    printf("redis-benchmark.c/readHandler");
 
     /* Calculate latency only for the first read event. This means that the
      * server already sent the reply and we need to parse it. Parsing overhead
