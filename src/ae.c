@@ -452,7 +452,8 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 
         /* Call the multiplexing API, will return only on timeout or when
          * some event fires. */
-        posix_numevents = aeApiPoll(eventLoop, tvp);
+        //posix_numevents = aeApiPoll(eventLoop, tvp);
+        posix_numevents = 0;
         mtcp_numevents = mtcp_aeApiPoll(eventLoop, tvp);
 #if 0
         // DEBUG
