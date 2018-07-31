@@ -53,7 +53,7 @@
 #define RANDPTR_INITIAL_SIZE 8
 
 #define _REDIS_BENCH_ZEUS_DEBUG_ 0
-
+static void showLatencyReport(void);
 static struct config {
     aeEventLoop *el;
     const char *hostip;
@@ -182,7 +182,9 @@ static void clientDone(client c) {
     //printf("clientDone finished:%d\n", config.requests_finished);
     //sleep(10);
     if (config.requests_finished == config.requests) {
+        config.totlatency = mstime()-config.start;
         printf("clientDone, finished:%d\n", config.requests);
+        showLatencyReport();
         freeClient(c);
         aeStop(config.el);
         return;
@@ -207,7 +209,8 @@ static void readHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
      /* Calculate latency only for the first read event. This means that the
      * server already sent the reply and we need to parse it. Parsing overhead
      * is not part of the latency, so calculate it only once, here. */
-    if (c->latency < 0) c->latency = ustime()-(c->start);
+    //if (c->latency < 0) c->latency = ustime()-(c->start);
+    long long temp_time = ustime();
 
     if (redisBufferRead(c->context) != REDIS_OK) {
         fprintf(stderr,"Error: %s\n",c->context->errstr);
@@ -219,6 +222,9 @@ static void readHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
                 exit(1);
             }
             if (reply != NULL) {
+                if(c->latency <0){
+                    c->latency = temp_time - (c->start);
+                }
                 if (reply == (void*)REDIS_REPLY_ERROR) {
                     fprintf(stderr,"Unexpected error reply, exiting...\n");
                     exit(1);
@@ -261,6 +267,7 @@ static void readHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
                     break;
                 }
             } else {
+                //printf("@@@ reply is NULL\n");
                 break;
             }
         }
@@ -280,7 +287,7 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
         /* Enforce upper bound to number of requests. */
         if (config.requests_issued++ >= config.requests) {
             printf("will freeClient issued>=request\n");
-            freeClient(c);
+            //freeClient(c);
             return;
         }
 
@@ -485,13 +492,15 @@ static void showLatencyReport(void) {
         printf("  keep alive: %d\n", config.keepalive);
         printf("\n");
 
-        qsort(config.latency,config.requests,sizeof(long long),compareLatency);
+        //qsort(config.latency,config.requests,sizeof(long long),compareLatency);
         for (i = 0; i < config.requests; i++) {
+            printf("i:%d  latency:%ld\n",i, config.latency[i]);
+            /**
             if (config.latency[i]/1000 != curlat || i == (config.requests-1)) {
                 curlat = config.latency[i]/1000;
                 perc = ((float)(i+1)*100)/config.requests;
                 printf("%.2f%% <= %d milliseconds\n", perc, curlat);
-            }
+            }**/
         }
         printf("%.2f requests per second\n\n", reqpersec);
     } else if (config.csv) {
@@ -510,12 +519,12 @@ static void benchmark(char *title, char *cmd, int len) {
 
     c = createClient(cmd,len,NULL);
     createMissingClients(c);
-
+    printf("redis-benchmark.c will count time\n");
     config.start = mstime();
     aeMain(config.el);
     config.totlatency = mstime()-config.start;
 
-    showLatencyReport();
+    // showLatencyReport();
     freeAllClients();
 }
 
