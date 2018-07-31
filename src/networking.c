@@ -926,7 +926,6 @@ int writeToClient(int fd, client *c, int handler_installed) {
                 // push success
                 nwritten = sga.bufs[0].len;
                 if(REDIS_ZEUS_DEBUG) printf("zeus_push success in server\n");
-                //sleep(5);
             }else{
                 // push return qtoken
                 nwritten = sga.bufs[0].len;
@@ -1451,7 +1450,6 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     if (npop == 0){
         nread = sga.bufs[0].len;
         printf("@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
-        sleep(5);
     }else{
         nread = -1;
         // nwait = zeus_wait(npop, &sga);
