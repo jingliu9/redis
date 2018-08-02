@@ -60,6 +60,7 @@
     #endif
 #endif
 
+
 aeEventLoop *aeCreateEventLoop(int setsize) {
     aeEventLoop *eventLoop;
     int i;
@@ -477,19 +478,20 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                 jj++;
             }
             if (eventLoop->read_fds[ii] > 0){
-                //printf("read_fds[%d] is %d, jj:%d\n", ii, eventLoop->read_fds[ii], jj);
-                int qd = eventLoop->read_fds[ii];
-                eventLoop->fired[jj].fd = qd;
-                eventLoop->fired[jj].mask = AE_READABLE;
-                jj++;
+                if(!(eventLoop->listen_fds[ii] > 0)){
+                    int qd = eventLoop->read_fds[ii];
+                    eventLoop->fired[jj].fd = qd;
+                    eventLoop->fired[jj].mask = AE_READABLE;
+                    jj++;
+                }
             }
-            if (eventLoop->write_fds[ii] > 0){
+            /**if (eventLoop->write_fds[ii] > 0){
                 //printf("write_fds[%d] is %d, jj:%d\n", ii, eventLoop->write_fds[ii], jj);
                 int qd = eventLoop->write_fds[ii];
                 eventLoop->fired[jj].fd = qd;
                 eventLoop->fired[jj].mask = AE_WRITABLE;
                 jj++;
-            }
+            }**/
         }
         //printf("nevents:%d jj_sum:%d\n", numevents, jj);
         numevents = jj;
@@ -566,7 +568,6 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
     /* Check time events */
     if (flags & AE_TIME_EVENTS)
         processed += processTimeEvents(eventLoop);
-
     return processed; /* return the number of processed file/time events */
 }
 
@@ -594,10 +595,14 @@ int aeWait(int fd, int mask, long long milliseconds) {
 
 void aeMain(aeEventLoop *eventLoop) {
     eventLoop->stop = 0;
+    int ret;
     while (!eventLoop->stop) {
         if (eventLoop->beforesleep != NULL)
             eventLoop->beforesleep(eventLoop);
-        aeProcessEvents(eventLoop, AE_ALL_EVENTS|AE_CALL_AFTER_SLEEP);
+        if(ret > 2){
+            nanosleep((const struct timespec[]){{0, 1L}}, NULL);
+        }
+        ret = aeProcessEvents(eventLoop, AE_ALL_EVENTS|AE_CALL_AFTER_SLEEP);
     }
 }
 
