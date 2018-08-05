@@ -917,7 +917,6 @@ int writeToClient(int fd, client *c, int handler_installed) {
     ssize_t npush;
     size_t objlen;
     sds o;
-
     if(REDIS_ZEUS_DEBUG) printf("networking.c/writeToClient fd:%d\n", fd);
 
     while(clientHasPendingReplies(c)) {
@@ -1580,7 +1579,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
 #ifdef _LIBOS_MEASURE_REDIS_APP_LOGIC_
     uint64_t end_process_tick = rdtsc();
     uint64_t make_room_overhead = make_room_tick - init_tick;
-    printf("overhead_prior:%lu time_tick_for_req(Process):%lu\n", 
+    fprintf(stdout, "overhead_prior:%lu time_tick_for_req(Process):%lu\n", 
             make_room_overhead, make_room_overhead + (end_process_tick - start_process_tick));
 #endif
 }
