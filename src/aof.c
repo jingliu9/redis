@@ -40,6 +40,8 @@
 #include <sys/wait.h>
 #include <sys/param.h>
 
+#include "io-queue_c.h"
+
 void aofUpdateCurrentSize(void);
 void aofClosePipes(void);
 
@@ -243,6 +245,7 @@ int startAppendOnly(void) {
     char cwd[MAXPATHLEN]; /* Current working dir path for error messages. */
     int newfd;
 
+    // LIBOSSPDK
     newfd = open(server.aof_filename,O_WRONLY|O_APPEND|O_CREAT,0644);
     serverAssert(server.aof_state == AOF_OFF);
     if (newfd == -1) {

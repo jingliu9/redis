@@ -35,6 +35,7 @@
 #include "atomicvar.h"
 
 #include "../measure.h"
+#include "io-queue_c.h"
 
 #include <time.h>
 #include <signal.h>
@@ -57,6 +58,7 @@
 #include <sys/utsname.h>
 #include <locale.h>
 #include <sys/socket.h>
+
 
 /* object to save measurement result */
 MEASURE_RCD libos_measure_rcd;
@@ -3751,6 +3753,8 @@ int main(int argc, char **argv) {
 #ifdef INIT_SETPROCTITLE_REPLACEMENT
     spt_init(argc, argv);
 #endif
+    // LIBOSSPDK
+    zeus_socket(0, 0, 0);
     setlocale(LC_COLLATE,"");
     zmalloc_set_oom_handler(redisOutOfMemoryHandler);
     srand(time(NULL)^getpid());

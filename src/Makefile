@@ -125,8 +125,22 @@ ifeq ($(MALLOC),jemalloc)
 	FINAL_LIBS+= ../deps/jemalloc/lib/libjemalloc.a
 endif
 
-REDIS_CC=$(QUIET_CC)$(CC) $(FINAL_CFLAGS)
+ZEUS_HOME=/users/jingliu/datacenter-OS/
+SPDK_ROOT_DIR=$(ZEUS_HOME)/libos/libspdk/spdk/
+FINAL_CFLAGS += -I$(DPDK_DIR)/include -I$(SPDK_DIR)/include
+ZEUS_CFLAGS := -I$(ZEUS_HOME)/include/
+ZEUS_LDFLAGS := -L$(ZEUS_HOME) -lzeus_spdk
+ZEUS_LDFLAGS += -lnuma -lpthread -lrt -ldl
+
+SPDK_LDFLAGS=-Wl,-z,relro,-z,now -Wl,-z,noexecstack -pthread  -Wl,--whole-archive -lspdk_copy_ioat -lspdk_ioat -Wl,--no-whole-archive  -Wl,--whole-archive -lspdk_vbdev_lvol -lspdk_blob -lspdk_blob_bdev -lspdk_lvol -lspdk_bdev_malloc -lspdk_bdev_null -lspdk_bdev_nvme -lspdk_nvme -lspdk_vbdev_passthru -lspdk_vbdev_error -lspdk_vbdev_gpt -lspdk_vbdev_split -lspdk_bdev_aio -lspdk_bdev_virtio -lspdk_virtio -Wl,--no-whole-archive -laio -L$(ZEUS_HOME)/libos/libspdk/spdk/build/lib -Wl,--whole-archive -lspdk_event_bdev -lspdk_event_copy -Wl,--no-whole-archive -lspdk_blobfs -lspdk_blob -lspdk_bdev -lspdk_blob_bdev -lspdk_copy -lspdk_event -lspdk_util -lspdk_conf -lspdk_trace -lspdk_log -lspdk_jsonrpc -lspdk_json -lspdk_rpc $(ZEUS_HOME)/libos/libspdk/spdk/build/lib/libspdk_env_dpdk.a -Wl,--start-group -Wl,--whole-archive $(ZEUS_HOME)/libos/libspdk/spdk/dpdk/build/lib/librte_eal.a $(ZEUS_HOME)/libos/libspdk/spdk/dpdk/build/lib/librte_mempool.a $(ZEUS_HOME)/libos/libspdk/spdk/dpdk/build/lib/librte_ring.a $(ZEUS_HOME)/libos/libspdk/spdk/dpdk/build/lib/librte_mempool_ring.a $(ZEUS_HOME)/libos/libspdk/spdk/dpdk/build/lib/librte_pci.a $(ZEUS_HOME)/libos/libspdk/spdk/dpdk/build/lib/librte_bus_pci.a -Wl,--end-group -Wl,--no-whole-archive -lnuma -ldl -lrt -luuid
+
+
+FINAL_LIBS+=$(ZEUS_LDFLAGS) $(SPDK_LDFLAGS)
+FINAL_LIBS+=-lstdc++
+
+REDIS_CC=$(QUIET_CC)$(CC) $(FINAL_CFLAGS) $(ZEUS_CFLAGS)
 REDIS_LD=$(QUIET_LINK)$(CC) $(FINAL_LDFLAGS)
+#$(ZEUS_LDFLAGS) $(SPDK_LDFLAGS)
 REDIS_INSTALL=$(QUIET_INSTALL)$(INSTALL)
 
 CCCOLOR="\033[34m"
