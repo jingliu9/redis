@@ -202,6 +202,7 @@ ssize_t aofRewriteBufferWrite(int fd) {
 /* Starts a background task that performs fsync() against the specified
  * file descriptor (the one of the AOF file) in another thread. */
 void aof_background_fsync(int fd) {
+    fprintf(stderr, "LIBOSSPDK aof_background_fsync: fd:%d\n", fd);
     bioCreateBackgroundJob(BIO_AOF_FSYNC,(void*)(long)fd,NULL,NULL);
 }
 
@@ -230,8 +231,9 @@ static void killAppendOnlyChild(void) {
 void stopAppendOnly(void) {
     serverAssert(server.aof_state != AOF_OFF);
     flushAppendOnlyFile(1);
-    aof_fsync(server.aof_fd);
-    close(server.aof_fd);
+    //aof_fsync(server.aof_fd);
+    //close(server.aof_fd);
+    zeus_close(server.aof_fd);
 
     server.aof_fd = -1;
     server.aof_selected_db = -1;
@@ -246,6 +248,8 @@ int startAppendOnly(void) {
     int newfd;
 
     // LIBOSSPDK
+    fprintf(stderr, "LIBOSPDK: will open %s\n", server.aof_filename);
+    exit(1);
     newfd = open(server.aof_filename,O_WRONLY|O_APPEND|O_CREAT,0644);
     serverAssert(server.aof_state == AOF_OFF);
     if (newfd == -1) {
@@ -293,7 +297,19 @@ int startAppendOnly(void) {
  * there is an actual error condition we'll get it at the next try. */
 ssize_t aofWrite(int fd, const char *buf, size_t len) {
     ssize_t nwritten = 0, totwritten = 0;
-
+    zeus_sgarray sga;
+    zeus_sgarray wait_sga;
+    sga.num_bufs = 1;
+    sga.bufs[0].buf = (zeus_ioptr)(buf);
+    sga.bufs[0].len = len;
+    zeus_qtoken qt = zeus_flush_push(fd, &sga);
+    int ret = zeus_wait(qt, &wait_sga);
+    if(ret >= 0){
+        totwritten = len;
+    }else{
+        totwritten = 0;
+    }
+    /**
     while(len) {
         nwritten = write(fd, buf, len);
 
@@ -307,8 +323,7 @@ ssize_t aofWrite(int fd, const char *buf, size_t len) {
         len -= nwritten;
         buf += nwritten;
         totwritten += nwritten;
-    }
-
+    }**/
     return totwritten;
 }
 
@@ -369,6 +384,7 @@ void flushAppendOnlyFile(int force) {
      * or alike */
 
     latencyStartMonitor(latency);
+    // LIBOSSPDK
     nwritten = aofWrite(server.aof_fd,server.aof_buf,sdslen(server.aof_buf));
     latencyEndMonitor(latency);
     /* We want to capture different events for delayed writes:
@@ -482,7 +498,9 @@ void flushAppendOnlyFile(int force) {
         /* aof_fsync is defined as fdatasync() for Linux in order to avoid
          * flushing metadata. */
         latencyStartMonitor(latency);
-        aof_fsync(server.aof_fd); /* Let's try to get this data on the disk */
+        // LIBOSSPDK, we do not do sync here
+        //fprintf(stderr, "LIBOSSPDK: flushAppendOnlyFIle wil aof_sync:%d\n", server.aof_fd);
+        //aof_fsync(server.aof_fd); /* Let's try to get this data on the disk */
         latencyEndMonitor(latency);
         latencyAddSampleIfNeeded("aof-fsync-always",latency);
         server.aof_last_fsync = server.unixtime;
@@ -680,6 +698,9 @@ int loadAppendOnlyFile(char *filename) {
     int old_aof_state = server.aof_state;
     long loops = 0;
     off_t valid_up_to = 0; /* Offset of latest well-formed command loaded. */
+
+    // LIBOSSPDK, regard as zero-length AOF file always (for testing, because spdk-ramdisk cannot support this)
+    return C_ERR;
 
     if (fp == NULL) {
         serverLog(LL_WARNING,"Fatal error: can't open the append log file for reading: %s",strerror(errno));
@@ -1467,7 +1488,7 @@ void aofRemoveTempFile(pid_t childpid) {
 void aofUpdateCurrentSize(void) {
     struct redis_stat sb;
     mstime_t latency;
-
+    fprintf(stderr, "LIBOSSPDK aofUpdateCurrentSize\n");
     latencyStartMonitor(latency);
     if (redis_fstat(server.aof_fd,&sb) == -1) {
         serverLog(LL_WARNING,"Unable to obtain the AOF file length. stat: %s",
@@ -1576,6 +1597,7 @@ void backgroundRewriteDoneHandler(int exitcode, int bysignal) {
             close(newfd);
         } else {
             /* AOF enabled, replace the old fd with the new one. */
+            fprintf(stderr, "LIBOSSPDK: aof enabled, will replace the old fd with the new one\n");
             oldfd = server.aof_fd;
             server.aof_fd = newfd;
             if (server.aof_fsync == AOF_FSYNC_ALWAYS)
