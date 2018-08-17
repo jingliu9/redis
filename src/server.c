@@ -1128,10 +1128,12 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
             long long base = server.aof_rewrite_base_size ?
                             server.aof_rewrite_base_size : 1;
             long long growth = (server.aof_current_size*100/base) - 100;
+            // LIBOSSPDK: we turn of rewrite here
+            /**
             if (growth >= server.aof_rewrite_perc) {
                 serverLog(LL_NOTICE,"Starting automatic rewriting of AOF on %lld%% growth",growth);
                 rewriteAppendOnlyFileBackground();
-            }
+            }**/
          }
     }
 
