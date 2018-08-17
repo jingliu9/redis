@@ -40,6 +40,14 @@
 #include <sys/wait.h>
 #include <sys/param.h>
 
+uint64_t rdtsc()
+{
+	uint32_t lo, hi;
+	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+	return ( ((uint64_t)hi) << (uint32_t)32 )
+	     | ( ((uint64_t)lo) );
+}
+
 void aofUpdateCurrentSize(void);
 void aofClosePipes(void);
 
@@ -479,9 +487,13 @@ void flushAppendOnlyFile(int force) {
         /* aof_fsync is defined as fdatasync() for Linux in order to avoid
          * flushing metadata. */
         latencyStartMonitor(latency);
+        uint64_t start_tick = rdtsc();
+        exit(1);
         aof_fsync(server.aof_fd); /* Let's try to get this data on the disk */
         latencyEndMonitor(latency);
         latencyAddSampleIfNeeded("aof-fsync-always",latency);
+        uint64_t end_tick = rdtsc();
+        fprintf(stdout, "fsync time: %lu\n", (end_tick - start_tick)/3591);
         server.aof_last_fsync = server.unixtime;
     } else if ((server.aof_fsync == AOF_FSYNC_EVERYSEC &&
                 server.unixtime > server.aof_last_fsync)) {
