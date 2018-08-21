@@ -39,7 +39,7 @@
 #include <errno.h>
 #include <ctype.h>
 
-#include "../../../../include/io-queue_c.h"
+#include "../../src/inc_libos.h"
 
 #include "hiredis.h"
 #include "net.h"
@@ -822,7 +822,7 @@ int redisBufferRead(redisContext *c) {
         printf("return value of nwait:%d nread:%d\n", nwait, nread);
     }**/
 
-    // use zeus_light_peek
+    // use zeus_light_pop
     npop = zeus_peek(c->fd, &sga);
     if(npop <= 0){
         // make sure handled as EAGAIN
@@ -841,9 +841,9 @@ int redisBufferRead(redisContext *c) {
         // try again later
         return REDIS_OK;
     }else if(nread != -1 && nread != 0){
-        printf("will do memcpy nread%d\n", nread);
+        if(HIREDIS_ZEUS_DEBUG) printf("will do memcpy nread%d\n", nread);
         memcpy(buf, ptr, nread);
-        printf("copy to buf:%s\n", buf);
+        if(HIREDIS_ZEUS_DEBUG) printf("copy to buf:%s\n", buf);
     }
     if (nread == -1) {
         if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
@@ -857,7 +857,7 @@ int redisBufferRead(redisContext *c) {
         __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
         return REDIS_ERR;
     } else {
-        printf("will call redisReaderFeed\n");
+        if(HIREDIS_ZEUS_DEBUG) printf("will call redisReaderFeed\n");
         if (redisReaderFeed(c->reader,buf,nread) != REDIS_OK) {
             __redisSetError(c,c->reader->err,c->reader->errstr);
             return REDIS_ERR;

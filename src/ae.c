@@ -60,6 +60,7 @@
     #endif
 #endif
 
+
 aeEventLoop *aeCreateEventLoop(int setsize) {
     aeEventLoop *eventLoop;
     int i;
@@ -160,7 +161,7 @@ void aeStop(aeEventLoop *eventLoop) {
 int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
         aeFileProc *proc, void *clientData)
 {
-    printf("ae.c/aeCreateFileEvent@@@@@@ fd:%d\n", fd);
+    //printf("ae.c/aeCreateFileEvent@@@@@@ fd:%d\n", fd);
     if (fd >= eventLoop->setsize) {
         errno = ERANGE;
         return AE_ERR;
@@ -174,12 +175,12 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
     if (mask & AE_WRITABLE) fe->wfileProc = proc;
     /* _JL_  record read and write events */
     if ((mask & AE_READABLE) && (eventLoop->read_fds)[fd] < 0) {
-        printf("ae.c/aeCreateFileEvent AE_READABLE\n");
+        //printf("ae.c/aeCreateFileEvent AE_READABLE\n");
         eventLoop->read_fd_sum ++;
         (eventLoop->read_fds)[fd] = fd;
     }
     if ((mask & AE_WRITABLE) && (eventLoop->write_fds)[fd] < 0) {
-        printf("ae.c/aeCreateFileEvent AE_WRITABLE\n");
+        //printf("ae.c/aeCreateFileEvent AE_WRITABLE\n");
         eventLoop->write_fd_sum ++;
         (eventLoop->write_fds)[fd] = fd;
     }
@@ -191,7 +192,7 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
 
 void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
 {
-    printf("ae.c/aeDeleteEvent @@@@@@fd:%d\n", fd);
+    // printf("ae.c/aeDeleteEvent @@@@@@fd:%d\n", fd);
     if (fd >= eventLoop->setsize) return;
     aeFileEvent *fe = &eventLoop->events[fd];
     if (fe->mask == AE_NONE) return;
@@ -460,7 +461,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         //numevents = aeApiPoll(eventLoop, tvp);
         numevents = eventLoop->listen_fd_sum + eventLoop->read_fd_sum + eventLoop->write_fd_sum;
         if(numevents < 0){
-            fprintf(stderr, "numevents error: %d\n", numevents);
+            // fprintf(stderr, "numevents error: %d\n", numevents);
         }
         //printf("@@@@@@numevents:%d listen_fd_sum:%d read_fd_sum:%d write_fd_sum:%d\n", numevents, eventLoop->listen_fd_sum, eventLoop->read_fd_sum, eventLoop->write_fd_sum);
 
@@ -477,19 +478,20 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                 jj++;
             }
             if (eventLoop->read_fds[ii] > 0){
-                //printf("read_fds[%d] is %d, jj:%d\n", ii, eventLoop->read_fds[ii], jj);
-                int qd = eventLoop->read_fds[ii];
-                eventLoop->fired[jj].fd = qd;
-                eventLoop->fired[jj].mask = AE_READABLE;
-                jj++;
+                if(!(eventLoop->listen_fds[ii] > 0)){
+                    int qd = eventLoop->read_fds[ii];
+                    eventLoop->fired[jj].fd = qd;
+                    eventLoop->fired[jj].mask = AE_READABLE;
+                    jj++;
+                }
             }
-            if (eventLoop->write_fds[ii] > 0){
+            /**if (eventLoop->write_fds[ii] > 0){
                 //printf("write_fds[%d] is %d, jj:%d\n", ii, eventLoop->write_fds[ii], jj);
                 int qd = eventLoop->write_fds[ii];
                 eventLoop->fired[jj].fd = qd;
                 eventLoop->fired[jj].mask = AE_WRITABLE;
                 jj++;
-            }
+            }**/
         }
         //printf("nevents:%d jj_sum:%d\n", numevents, jj);
         numevents = jj;
@@ -566,7 +568,6 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
     /* Check time events */
     if (flags & AE_TIME_EVENTS)
         processed += processTimeEvents(eventLoop);
-
     return processed; /* return the number of processed file/time events */
 }
 
@@ -594,10 +595,14 @@ int aeWait(int fd, int mask, long long milliseconds) {
 
 void aeMain(aeEventLoop *eventLoop) {
     eventLoop->stop = 0;
+    int ret;
     while (!eventLoop->stop) {
         if (eventLoop->beforesleep != NULL)
             eventLoop->beforesleep(eventLoop);
-        aeProcessEvents(eventLoop, AE_ALL_EVENTS|AE_CALL_AFTER_SLEEP);
+        if(ret > 2){
+            nanosleep((const struct timespec[]){{0, 1L}}, NULL);
+        }
+        ret = aeProcessEvents(eventLoop, AE_ALL_EVENTS|AE_CALL_AFTER_SLEEP);
     }
 }
 

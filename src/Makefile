@@ -13,8 +13,7 @@
 # Just use 'make dep', but this is only needed by developers.
 #
 ifndef ZEUS_SRC_DIR
-	#ZEUS_SRC_DIR=${HOME}/datacenter-OS/
-	ZEUS_SRC_DIR = ${HOME}/msr/datacenter-os/src
+	ZEUS_SRC_DIR=${HOME}/datacenter-OS/
 endif
 
 release_hdr := $(shell sh -c './mkreleasehdr.sh')
@@ -44,6 +43,9 @@ endif
 endif
 endif
 
+USE_JEMALLOC=no
+#MALLOC=libc
+
 # To get ARM stack traces if Redis crashes we need a special C flag.
 ifneq (,$(findstring armv,$(uname_M)))
         CFLAGS+=-funwind-tables
@@ -69,18 +71,33 @@ endif
 # Override default settings if possible
 -include .make-settings
 
+ZEUS_LIB_NAME=zeus_rdma
 ZEUS_CFLAGS := -I$(ZEUS_SRC_DIR)
-ZEUS_LDFLAGS := -L$(ZEUS_SRC_DIR) -lzeus_posix -Wl,-rpath,$(ZEUS_SRC_DIR)
+ZEUS_LDFLAGS := -L$(ZEUS_SRC_DIR) -l$(ZEUS_LIB_NAME)  -lhoard -Wl,-rpath,$(ZEUS_SRC_DIR)
+
+#DPDK_HOME=$(ZEUS_SRC_DIR)/libos/libmtcp/mtcp/dpdk/
+#DPDK_INC=$(DPDK_HOME)/include
+#DPDK_LIB=$(DPDK_HOME)/lib/
+#DPDK_MACHINE_FLAGS = $(shell cat ${HOME}/datacenter-OS/libos/libmtcp/mtcp/dpdk/include/cflags.txt)
+#DPDK_LIB_FLAGS = $(shell cat ${HOME}/datacenter-OS/libos/libmtcp/mtcp/dpdk/lib/ldflags.txt) -lgmp
+
+# MTCP
+#MTCP_FLD    =${HOME}/datacenter-OS/libos/libmtcp/mtcp/mtcp/
+#MTCP_INC    =-I$(MTCP_FLD)/include
+#MTCP_LIB    =-L$(MTCP_FLD)/lib
+#MTCP_TARGET = $(MTCP_LIB)/lib/libmtcp.a
 
 FINAL_CFLAGS=$(STD) $(WARN) $(OPT) $(DEBUG) $(CFLAGS) $(REDIS_CFLAGS)
 FINAL_LDFLAGS=$(LDFLAGS) $(REDIS_LDFLAGS) $(DEBUG)
 FINAL_LIBS=-lm
 DEBUG=-g -ggdb
 
-ZEUS_LIBS := -L../../../ -lzeus_posix
+ZEUS_LIBS := -L../../../ -lzeus_rdma -lhoard -Wl,-rpath,$(ZEUS_SRC_DIR)
 FINAL_CFLAGS += $(ZEUS_CFLAGS)
+#FINAL_CFLAGS += $(MTCP_INC) $(DPDK_MACHINE_FLAGS) -I$(DPDK_INC) -include $(DPDK_INC)/rte_config.h
 FINAL_LDFLAGS += $(ZEUS_LDFLAGS)
 FINAL_LIBS += $(ZEUS_LIBS)
+FINAL_LIBS += -lstdc++
 
 
 ifeq ($(uname_S),SunOS)

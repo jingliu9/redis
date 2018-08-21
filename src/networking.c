@@ -32,8 +32,18 @@
 #include <sys/uio.h>
 #include <math.h>
 #include <ctype.h>
+#include <sys/time.h>
+#include "../measure.h"
 
 static void setProtocolError(const char *errstr, client *c, long pos);
+
+static inline uint64_t rdtsc(void)
+{
+    uint64_t eax, edx;
+    __asm volatile ("rdtsc" : "=a" (eax), "=d" (edx));
+    return (edx << 32) | eax;
+}
+
 
 /* Return the size consumed from the allocator, for the specified SDS string,
  * including internal fragmentation. This function is used in order to compute
@@ -69,7 +79,7 @@ int listMatchObjects(void *a, void *b) {
 
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
-    printf("createClient fd:%d\n", fd);
+    if(REDIS_ZEUS_DEBUG) printf("createClient fd:%d\n", fd);
 
     /* passing -1 as fd it is possible to create a non connected client.
      * This is useful since all the commands needs to be executed
@@ -310,9 +320,9 @@ void _addReplyStringToList(client *c, const char *s, size_t len) {
  * -------------------------------------------------------------------------- */
 
 void addReply(client *c, robj *obj) {
-    printf("addReply list_len:%d\n", listLength(server.clients_pending_write));
+    if(REDIS_ZEUS_DEBUG) printf("addReply list_len:%d\n", listLength(server.clients_pending_write));
     if (prepareClientToWrite(c) != C_OK) return;
-    printf("addReply, has prepare client to write, list_len:%d\n", listLength(server.clients_pending_write));
+    if(REDIS_ZEUS_DEBUG) printf("addReply, has prepare client to write, list_len:%d\n", listLength(server.clients_pending_write));
 
     /* This is an important place where we can avoid copy-on-write
      * when there is a saving child running, avoiding touching the
@@ -613,7 +623,7 @@ int clientHasPendingReplies(client *c) {
 #define MAX_ACCEPTS_PER_CALL 1000
 static void acceptCommonHandler(int fd, int flags, char *ip) {
     client *c;
-    printf("acceptCommonHandler fd %d\n", fd);
+    if(REDIS_ZEUS_DEBUG) printf("acceptCommonHandler fd %d\n", fd);
     if ((c = createClient(fd)) == NULL) {
         serverLog(LL_WARNING,
             "Error registering fd event for the new client: %s (fd=%d)",
@@ -907,8 +917,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
     ssize_t npush;
     size_t objlen;
     sds o;
-
-    printf("networking.c/writeToClient fd:%d\n", fd);
+    if(REDIS_ZEUS_DEBUG) printf("networking.c/writeToClient fd:%d\n", fd);
 
     while(clientHasPendingReplies(c)) {
         if (c->bufpos > 0) {
@@ -919,19 +928,26 @@ int writeToClient(int fd, client *c, int handler_installed) {
             sga.num_bufs = 1;
             sga.bufs[0].buf = (zeus_ioptr)(c->buf+c->sentlen);
             sga.bufs[0].len = c->bufpos-c->sentlen;
-            printf("before zeus_push\n");
+            if(REDIS_ZEUS_DEBUG) printf("before zeus_push\n");
             //nwritten = zeus_push(fd, &sga);
+#ifdef _LIBOS_MEASURE_REDIS_NETWORKING_PUSH_ID_
+            uint64_t rcd_start, rcd_end;
+            rcd_start = rdtsc();
+#endif
             npush = zeus_push(fd, &sga);
+#ifdef _LIBOS_MEASURE_REDIS_NETWORKING_PUSH_ID_
+            rcd_end = rdtsc();
+            printf("mpoint:%d time_tick:%lu\n", (_LIBOS_MEASURE_REDIS_NETWORKING_PUSH_ID_), (rcd_end - rcd_start));
+#endif
             if(npush == 0){
                 // push success
                 nwritten = sga.bufs[0].len;
-                printf("zeus_push success in server\n");
-                //sleep(5);
+                if(REDIS_ZEUS_DEBUG) printf("zeus_push success in server\n");
             }else{
                 // push return qtoken
                 nwritten = sga.bufs[0].len;
             }
-            printf("after zeus_push npush:%d\n", npush);
+            if(REDIS_ZEUS_DEBUG) printf("after zeus_push npush:%d\n", npush);
 
             if (nwritten <= 0) break;
             c->sentlen += nwritten;
@@ -989,7 +1005,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
              zmalloc_used_memory() < server.maxmemory) &&
             !(c->flags & CLIENT_SLAVE)) break;
     }
-    printf("writeToClient, endofpush() nwritten:%d\n", nwritten);
+    if(REDIS_ZEUS_DEBUG) printf("writeToClient, endofpush() nwritten:%d\n", nwritten);
     server.stat_net_output_bytes += totwritten;
     if (nwritten == -1) {
         if (errno == EAGAIN) {
@@ -1018,7 +1034,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
             return C_ERR;
         }
     }
-    printf("return from writeToClient\n");
+    if(REDIS_ZEUS_DEBUG) printf("return from writeToClient\n");
     server.el->write_fds[fd] = -1;
     server.el->write_fd_sum--;
     return C_OK;
@@ -1028,7 +1044,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
 void sendReplyToClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
-    printf("sendReplyToClient\n");
+    if(REDIS_ZEUS_DEBUG) printf("sendReplyToClient\n");
     writeToClient(fd,privdata,1);
 }
 
@@ -1353,7 +1369,7 @@ int processMultibulkBuffer(client *c) {
  * or because a client was blocked and later reactivated, so there could be
  * pending query buffer, already representing a full command, to process. */
 void processInputBuffer(client *c) {
-    printf("processInputBuffer\n");
+    if(REDIS_ZEUS_DEBUG) printf("processInputBuffer\n");
     server.current_client = c;
     /* Keep processing while there is something in the input buffer */
     while(sdslen(c->querybuf)) {
@@ -1422,6 +1438,10 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(mask);
     UNUSED(nwait);
 
+#ifdef _LIBOS_MEASURE_REDIS_APP_LOGIC_
+    uint64_t init_tick = rdtsc();
+#endif
+
     //if(REDIS_ZEUS_DEBUG) printf("networking.c/readQueryFromClient fd:%d\n", fd);
 
     readlen = PROTO_IOBUF_LEN;
@@ -1442,6 +1462,9 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     qblen = sdslen(c->querybuf);
     if (c->querybuf_peak < qblen) c->querybuf_peak = qblen;
     c->querybuf = sdsMakeRoomFor(c->querybuf, readlen);
+#ifdef _LIBOS_MEASURE_REDIS_APP_LOGIC_
+    uint64_t make_room_tick = rdtsc();
+#endif
     //printf("netoworking.c@@@@@@readQueryFromClient/read(%d)\n", fd);
     //nread = read(fd, c->querybuf+qblen, readlen);
     zeus_sgarray sga;
@@ -1451,7 +1474,6 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     if (npop == 0){
         nread = sga.bufs[0].len;
         printf("@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
-        sleep(5);
     }else{
         nread = -1;
         // nwait = zeus_wait(npop, &sga);
@@ -1461,8 +1483,19 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     //printf("@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
     **/
 
+#ifdef _LIBOS_MEASURE_REDIS_NETWORKING_POP_ID_
+    uint64_t rcd_start, rcd_end;
+    rcd_start = rdtsc();
+#endif
     // use peek
     npop = zeus_peek(fd, &sga);
+
+#ifdef _LIBOS_MEASURE_REDIS_NETWORKING_POP_ID_
+    rcd_end = rdtsc();
+    if(npop > 0){
+        fprintf(stderr,"mpoint:%d time_tick:%lu\n", (_LIBOS_MEASURE_REDIS_NETWORKING_POP_ID_), (rcd_end - rcd_start));
+    }
+#endif
     if(npop <= 0){
         // make sure handled as EAGAIN
         nread = -1;
@@ -1476,6 +1509,10 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
         npop = 0;
     }
 
+
+#ifdef _LIBOS_MEASURE_REDIS_APP_LOGIC_
+    uint64_t start_process_tick = rdtsc();
+#endif
     char *ptr = (char*)(sga.bufs[0].buf);
     if (npop > 0 || npop == C_ZEUS_IO_ERR_NO) {
         // regard as EAGAIN
@@ -1527,7 +1564,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
      * the sub-slaves and to the replication backlog. */
     if (!(c->flags & CLIENT_MASTER)) {
         processInputBuffer(c);
-        printf("after process Input buffer\n");
+        if(REDIS_ZEUS_DEBUG) printf("after process Input buffer\n");
     } else {
         size_t prev_offset = c->reploff;
         processInputBuffer(c);
@@ -1538,6 +1575,13 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
             sdsrange(c->pending_querybuf,applied,-1);
         }
     }
+
+#ifdef _LIBOS_MEASURE_REDIS_APP_LOGIC_
+    uint64_t end_process_tick = rdtsc();
+    uint64_t make_room_overhead = make_room_tick - init_tick;
+    fprintf(stdout, "overhead_prior:%lu time_tick_for_req(Process):%lu\n", 
+            make_room_overhead, make_room_overhead + (end_process_tick - start_process_tick));
+#endif
 }
 
 void getClientsMaxBuffers(unsigned long *longest_output_list,
