@@ -1488,7 +1488,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     rcd_start = rdtsc();
 #endif
     // use light_pop
-    npop = zeus_light_pop(fd, &sga);
+    npop = zeus_peek(fd, &sga);
 
 #ifdef _LIBOS_MEASURE_REDIS_NETWORKING_POP_ID_
     rcd_end = rdtsc();

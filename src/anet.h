@@ -32,7 +32,7 @@
 #define ANET_H
 
 #include <sys/types.h>
-#include "../../../include/io-queue_c.h"
+#include "inc_libos.h"
 
 #define ANET_OK 0
 #define ANET_ERR -1

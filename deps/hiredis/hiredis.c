@@ -39,7 +39,7 @@
 #include <errno.h>
 #include <ctype.h>
 
-#include "../../../../include/io-queue_c.h"
+#include "../../src/inc_libos.h"
 
 #include "hiredis.h"
 #include "net.h"
@@ -823,7 +823,7 @@ int redisBufferRead(redisContext *c) {
     }**/
 
     // use zeus_light_pop
-    npop = zeus_light_pop(c->fd, &sga);
+    npop = zeus_peek(c->fd, &sga);
     if(npop <= 0){
         // make sure handled as EAGAIN
         nread = -1;
