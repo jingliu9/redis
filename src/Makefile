@@ -71,7 +71,7 @@ endif
 # Override default settings if possible
 -include .make-settings
 
-ZEUS_LIB_NAME=zeus_rdma
+ZEUS_LIB_NAME=zeus_posix
 ZEUS_CFLAGS := -I$(ZEUS_SRC_DIR)
 ZEUS_LDFLAGS := -L$(ZEUS_SRC_DIR) -l$(ZEUS_LIB_NAME)  -lhoard -Wl,-rpath,$(ZEUS_SRC_DIR)
 
