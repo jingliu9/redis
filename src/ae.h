@@ -34,6 +34,7 @@
 #define __AE_H__
 
 #include <time.h>
+//#include "uthash.h"
 
 #define AE_OK 0
 #define AE_ERR -1
@@ -59,8 +60,6 @@
 
 /* Macros */
 #define AE_NOTUSED(V) ((void) V)
-
-
 
 struct aeEventLoop;
 
@@ -91,9 +90,18 @@ typedef struct aeTimeEvent {
 
 /* A fired event */
 typedef struct aeFiredEvent {
+    // _JL_
     int fd;
+    int qd;
     int mask;
 } aeFiredEvent;
+
+/**
+struct qd_map_item{
+    int fd; // key 
+    int qd;
+    UT_hash_handle hh;
+};**/
 
 /* State of an event based program */
 typedef struct aeEventLoop {
@@ -109,13 +117,19 @@ typedef struct aeEventLoop {
     aeBeforeSleepProc *beforesleep;
     aeBeforeSleepProc *aftersleep;
     /* _JL_ */
-    int *read_fds;
-    int read_fd_sum;
-    int *listen_fds;
-    int listen_fd_sum;
-    int *write_fds;
-    int write_fd_sum;
+    // read
+    int *read_qds;
+    int read_qd_sum;
+    // listen
+    int *listen_qds;
+    int listen_qd_sum;
+    // write
+    int *write_qds;
+    int write_qd_sum;
+    //struct qd_map_item *fd_qd_map;
+    /////////
 } aeEventLoop;
+
 
 /* Prototypes */
 aeEventLoop *aeCreateEventLoop(int setsize);

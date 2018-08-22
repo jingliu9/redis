@@ -80,6 +80,7 @@ int listMatchObjects(void *a, void *b) {
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
     if(REDIS_ZEUS_DEBUG) printf("createClient fd:%d\n", fd);
+    fprintf(stderr, "createClient for fd:%d\n", fd);
 
     /* passing -1 as fd it is possible to create a non connected client.
      * This is useful since all the commands needs to be executed
@@ -702,14 +703,39 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
 
     while(max--) {
         cfd = anetTcpAccept(server.neterr, fd, cip, sizeof(cip), &cport);
-        //printf("acceptTcpHandler :%d\n", cfd);
+        //fprintf("acceptTcpHandler :%d\n", cfd);
+        if(cfd == ANET_ERR && errno == EAGAIN){
+            return;
+        }
+        if(cfd == zeus_qd2fd(cfd)){
+            fprintf(stderr, "ERROR cfd:%d\n", cfd);
+            exit(1);
+        }
         if (cfd == ANET_ERR) {
             if (errno != EWOULDBLOCK)
                 serverLog(LL_WARNING,
                     "Accepting client connection: %s", server.neterr);
             return;
         }
-        serverLog(LL_VERBOSE,"Accepted %s:%d", cip, cport);
+        fprintf(stderr, "accept cfd:%d\n", cfd);
+        /***************
+        struct qd_map_item *qd_item_ptr;
+        struct qd_map_item *qd_item_found;
+        int cur_qd = cfd;
+        int cur_fd = zeus_qd2fd(cur_qd);
+        serverLog(LL_VERBOSE,"Accepted %s:%d  cqd:%d", cip, cport, cfd);
+        // save the accepted fd
+        HASH_FIND_INT(server.el->fd_qd_map, &cur_qd, qd_item_found);
+        if(qd_item_found != NULL){
+            fprintf(stderr, "WARNING: add duplicated qd into map qd:%d\n", cur_qd);
+        }else{
+            // save the qd_fd mapping
+            qd_item_ptr = (struct qd_map_item*) malloc(sizeof(*qd_item_ptr));
+            qd_item_ptr->fd = cur_fd;
+            qd_item_ptr->qd = cur_qd;
+            HASH_ADD_INT(server.el->fd_qd_map, fd, qd_item_ptr);
+            fprintf(stderr, "acceptTcpHandler: insert mapping qd:%d fd:%d\n", qd_item_ptr->qd, qd_item_ptr->fd);
+        }*****************/
         acceptCommonHandler(cfd,0,cip);
     }
 }
@@ -1035,8 +1061,8 @@ int writeToClient(int fd, client *c, int handler_installed) {
         }
     }
     if(REDIS_ZEUS_DEBUG) printf("return from writeToClient\n");
-    server.el->write_fds[fd] = -1;
-    server.el->write_fd_sum--;
+    server.el->write_qds[fd] = -1;
+    server.el->write_qd_sum--;
     return C_OK;
 }
 

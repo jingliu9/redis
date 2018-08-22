@@ -92,7 +92,7 @@ FINAL_LDFLAGS=$(LDFLAGS) $(REDIS_LDFLAGS) $(DEBUG)
 FINAL_LIBS=-lm
 DEBUG=-g -ggdb
 
-ZEUS_LIBS := -L../../../ -lzeus_rdma -lhoard -Wl,-rpath,$(ZEUS_SRC_DIR)
+ZEUS_LIBS := -L../../../ -l$(ZEUS_LIB_NAME) -lhoard -Wl,-rpath,$(ZEUS_SRC_DIR)
 FINAL_CFLAGS += $(ZEUS_CFLAGS)
 #FINAL_CFLAGS += $(MTCP_INC) $(DPDK_MACHINE_FLAGS) -I$(DPDK_INC) -include $(DPDK_INC)/rte_config.h
 FINAL_LDFLAGS += $(ZEUS_LDFLAGS)

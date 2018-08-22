@@ -1857,13 +1857,27 @@ void initServer(void) {
 
     /* _JL_ record the listening port */
     int ii;
-    assert(server.el->listen_fd_sum == 0);
-    server.el->listen_fd_sum = server.ipfd_count;
+    assert(server.el->listen_qd_sum == 0);
     for(ii = 0; ii < server.ipfd_count; ii++) {
-        server.el->listen_fds[server.ipfd[ii]] = server.ipfd[ii];
-        printf("server.c/initServer@@@@@@  listen_fds[%d] = %d\n", server.ipfd[ii], server.ipfd[ii]);
-        //server.el->listen_fds[ii] = server.ipfd[ii];
-        //printf("server.c/initServer@@@@@@  listen_fds[%d] = %d\n", ii, server.el->listen_fds[ii]);
+        int cur_qd = server.ipfd[ii];
+        int cur_fd = zeus_qd2fd(cur_qd);
+        server.el->listen_qds[server.el->listen_qd_sum] = cur_qd;
+        server.el->listen_qd_sum++;
+        /**
+        struct qd_map_item *qd_item_ptr;
+        struct qd_map_item *qd_item_found;
+        HASH_FIND_INT(server.el->fd_qd_map, &cur_fd, qd_item_found);
+        if(qd_item_found != NULL){
+            fprintf(stderr, "WARNING: add duplicated qd into map qd:%d\n", cur_qd);
+        }else{
+            // save the qd_fd mapping
+            qd_item_ptr = (struct qd_map_item*) malloc(sizeof(*qd_item_ptr));
+            qd_item_ptr->qd = cur_qd;
+            qd_item_ptr->fd = cur_fd;
+            HASH_ADD_INT(server.el->fd_qd_map, fd, qd_item_ptr);
+            fprintf(stderr, "insert into map: qd:%d fd:%d\n", cur_qd, qd_item_ptr->fd);
+        }**/
+        fprintf(stderr, "server.c/initServer@@@@@@  listen_qds[%d] = %d listen_qd_sum:%d\n", ii, server.ipfd[ii], server.el->listen_qd_sum);
     }
 
 
@@ -1950,15 +1964,15 @@ void initServer(void) {
     if (server.sofd > 0 && aeCreateFileEvent(server.el,server.sofd,AE_READABLE,
         acceptUnixHandler,NULL) == AE_ERR) serverPanic("Unrecoverable error creating server.sofd file event.");
 
-
     /* Register a readable event for the pipe used to awake the event loop
      * when a blocked client in a module needs attention. */
+    /** _JL_ no module
     if (aeCreateFileEvent(server.el, server.module_blocked_pipe[0], AE_READABLE,
         moduleBlockedClientPipeReadable,NULL) == AE_ERR) {
             serverPanic(
                 "Error registering the readable event for the module "
                 "blocked clients subsystem.");
-    }
+    }**/
 
     /* Open the AOF file if needed. */
     if (server.aof_state == AOF_ON) {
@@ -3661,7 +3675,7 @@ int redisSupervisedSystemd(void) {
 
     serverLog(LL_NOTICE, "supervised by systemd, will signal readiness");
     //if ((fd = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
-    if ((fd = zeus_queue(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
+    if ((fd = zeus_socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
         serverLog(LL_WARNING,
                 "Can't connect to systemd socket %s", notify_socket);
         return 0;

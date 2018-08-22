@@ -259,7 +259,7 @@ static int anetSetReuseAddr(char *err, int fd) {
 static int anetCreateSocket(char *err, int domain) {
     int s;
     //if ((s = socket(domain, SOCK_STREAM, 0)) == -1) {
-    if ((s = zeus_queue(domain, SOCK_STREAM, 0)) == -1) {
+    if ((s = zeus_socket(domain, SOCK_STREAM, 0)) == -1) {
         anetSetError(err, "creating socket: %s", strerror(errno));
         return ANET_ERR;
     }
@@ -299,7 +299,7 @@ static int anetTcpGenericConnect(char *err, char *addr, int port,
          * If we fail in the socket() call, or on connect(), we retry with
          * the next entry in servinfo. */
         //if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
-        if ((s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        if ((s = zeus_socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
             continue;
         if (anetSetReuseAddr(err,s) == ANET_ERR) goto error;
         if (flags & ANET_CONNECT_NONBLOCK && anetNonBlock(err,s) != ANET_OK)
@@ -465,6 +465,7 @@ static int anetListen(char *err, int s, struct sockaddr *sa, socklen_t len, int 
     }
 
     //if (listen(s, backlog) == -1) {
+    fprintf(stderr, "anetListen: listen on qd:%d\n", s);
     if (zeus_listen(s, backlog) == -1) {
         anetSetError(err, "listen: %s", strerror(errno));
         close(s);
@@ -501,11 +502,7 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
         //if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
-        /**
-        if ((s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
-            continue;
-        **/
-        s = zeus_queue(p->ai_family,p->ai_socktype,p->ai_protocol);
+        s = zeus_socket(p->ai_family,p->ai_socktype,p->ai_protocol);
         // printf("_JL_@@@anet.c/_anetTcpServer:zeus_queue return:%d\n", s);
         if(s == -1){
             continue;
@@ -569,9 +566,20 @@ int anetUnixServer(char *err, char *path, mode_t perm, int backlog)
 
 static int anetGenericAccept(char *err, int s, struct sockaddr *sa, socklen_t *len) {
     int fd;
+    zeus_sgarray sga;
     while(1) {
-        //fd = accept(s,sa,len);
-        fd = zeus_accept(s,sa,len);
+        //qt = zeus_pop(s,&sga);
+        fd = zeus_accept(s, sa, len);
+        int real_fd = zeus_qd2fd(fd);
+        fprintf(stderr, "zeus_accept returns qd:%d fd:%d\n", fd, real_fd);
+        if(fd == 0 || fd == real_fd){
+            if(fd != 0){
+                zeus_close(fd);
+            }
+            errno = EAGAIN;
+            return ANET_ERR;
+        }
+        fprintf(stderr, "anetGenericAccept accepted qd:%d fd:%d\n", fd, real_fd);
         if (fd == -1) {
             if (errno == EINTR)
                 continue;
