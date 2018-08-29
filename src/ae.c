@@ -77,21 +77,15 @@ aeEventLoop *aeCreateEventLoop(int setsize) {
     eventLoop->maxfd = -1;
     eventLoop->beforesleep = NULL;
     eventLoop->aftersleep = NULL;
-    /* _JL_ init qd maps to NULL */
-    //eventLoop->fd_qd_map = NULL;
-
-    /* _JL_ init fds in EventLoop */
-    eventLoop->read_qds = zmalloc(sizeof(int)*setsize);
-    eventLoop->read_qd_sum = 0;
-    eventLoop->listen_qds = zmalloc(sizeof(int)*setsize);
-    eventLoop->listen_qd_sum = 0;
-    eventLoop->write_qds = zmalloc(sizeof(int)*setsize);
-    eventLoop->write_qd_sum = 0;
-    for(i = 0; i < setsize; i++) {
-        eventLoop->read_qds[i] = -1;
-        eventLoop->listen_qds[i] = -1;
-        eventLoop->write_qds[i] = -1;
+    /* _JL_ init qd status map */
+    // NOTE events always use fd as index
+    eventLoop->qd_status_map = NULL;  /* required init for hash data structure */
+    eventLoop->qd_status_array = zmalloc(sizeof(aeFiredEvent)*setsize);
+    eventLoop->qd_status_array_index = 0;
+    for(i = 0; i < setsize; i++){
+        eventLoop->qd_status_array[i].status = LIBOS_Q_STATUS_NONE;
     }
+    /**************************/
 
     if (aeApiCreate(eventLoop) == -1) goto err;
     /* Events with mask == AE_NONE are not set. So let's initialize the
@@ -104,6 +98,7 @@ err:
     if (eventLoop) {
         zfree(eventLoop->events);
         zfree(eventLoop->fired);
+        zfree(eventLoop->qd_status_array);
         zfree(eventLoop);
     }
     return NULL;
@@ -133,19 +128,13 @@ int aeResizeSetSize(aeEventLoop *eventLoop, int setsize) {
     eventLoop->setsize = setsize;
 
     /* _JL_ re-init in re-size */
-    eventLoop->listen_qds = zrealloc(eventLoop->listen_qds, sizeof(int)*setsize);
-    eventLoop->read_qds = zrealloc(eventLoop->read_qds, sizeof(int)*setsize);
-    eventLoop->write_qds = zrealloc(eventLoop->write_qds, sizeof(int)*setsize);
+    eventLoop->qd_status_array = zrealloc(eventLoop->qd_status_array,sizeof(aeFileEvent)*setsize);
 
     /* Make sure that if we created new slots, they are initialized with
      * an AE_NONE mask. */
     for (i = eventLoop->maxfd+1; i < setsize; i++) {
         eventLoop->events[i].mask = AE_NONE;
-        /*******/
-        eventLoop->read_qds[i] = -1;
-        eventLoop->listen_qds[i] = -1;
-        eventLoop->write_qds[i] = -1;
-        /*******/
+        eventLoop->qd_status_array[i].status = LIBOS_Q_STATUS_NONE;
     }
     return AE_OK;
 }
@@ -164,7 +153,13 @@ void aeStop(aeEventLoop *eventLoop) {
 int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
         aeFileProc *proc, void *clientData)
 {
-    fprintf(stderr, "ae.c/aeCreateFileEvent@@@@@@ qd:%d\n", fd);
+    /**
+     * _JL_:
+     * we would not create event here,
+     * the return of wait any essentially
+     *
+     **/
+#if 0
     int qd = fd;
     int cur_fd = zeus_qd2fd(qd);
     if(cur_fd < 0){
@@ -186,25 +181,16 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
     fe->mask |= mask;
     if (mask & AE_READABLE) fe->rfileProc = proc;
     if (mask & AE_WRITABLE) fe->wfileProc = proc;
-    /* _JL_  record read and write events */
-    if ((mask & AE_READABLE)) {
-        //fprintf(stderr, "ae.c/aeCreateFileEvent AE_READABLE\n");
-        (eventLoop->read_qds)[eventLoop->read_qd_sum] = qd;
-        eventLoop->read_qd_sum ++;
-    }
-    if ((mask & AE_WRITABLE)) {
-        //fprintf(stderr, "ae.c/aeCreateFileEvent AE_WRITABLE\n");
-        (eventLoop->write_qds)[eventLoop->write_qd_sum] = qd;
-        eventLoop->write_qd_sum ++;
-    }
     fe->clientData = clientData;
     if (fd > eventLoop->maxfd)
         eventLoop->maxfd = fd;
+#endif
     return AE_OK;
 }
 
 void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
 {
+#if 0
     // printf("ae.c/aeDeleteEvent @@@@@@fd:%d\n", fd);
     if (fd >= eventLoop->setsize) return;
     aeFileEvent *fe = &eventLoop->events[fd];
@@ -213,20 +199,6 @@ void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
     /* We want to always remove AE_BARRIER if set when AE_WRITABLE
      * is removed. */
     if (mask & AE_WRITABLE) mask |= AE_BARRIER;
-
-    /* _JL_ */
-    if (mask & AE_READABLE) {
-        if(eventLoop->read_qds[fd] > 0){
-            eventLoop->read_qd_sum--;
-            (eventLoop->read_qds)[fd] = -1;
-        }
-    }
-    if (mask & AE_WRITABLE) {
-        if(eventLoop->write_qds[fd] > 0){
-            eventLoop->write_qd_sum--;
-            (eventLoop->write_qds)[fd] = -1;
-        }
-    }
 
     aeApiDelEvent(eventLoop, fd, mask);
     fe->mask = fe->mask & (~mask);
@@ -238,6 +210,7 @@ void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
             if (eventLoop->events[j].mask != AE_NONE) break;
         eventLoop->maxfd = j;
     }
+#endif
 }
 
 int aeGetFileEvents(aeEventLoop *eventLoop, int fd) {
@@ -482,7 +455,6 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         // simply add all the events to fired list, assume check returned err and errno to avoid exiting
         int ii, jj, kk;
         jj = 0;
-        struct qd_map_item *qd_item_found;
         for(ii = 0; ii < eventLoop->listen_qd_sum; ii++){
             int qd = eventLoop->listen_qds[ii];
             eventLoop->fired[jj].fd = zeus_qd2fd(qd);
@@ -508,7 +480,6 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                 jj++;
             }
         }
-        //printf("nevents:%d jj_sum:%d\n", numevents, jj);
         numevents = jj;
 
         /* After sleep callback. */

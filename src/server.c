@@ -1863,20 +1863,6 @@ void initServer(void) {
         int cur_fd = zeus_qd2fd(cur_qd);
         server.el->listen_qds[server.el->listen_qd_sum] = cur_qd;
         server.el->listen_qd_sum++;
-        /**
-        struct qd_map_item *qd_item_ptr;
-        struct qd_map_item *qd_item_found;
-        HASH_FIND_INT(server.el->fd_qd_map, &cur_fd, qd_item_found);
-        if(qd_item_found != NULL){
-            fprintf(stderr, "WARNING: add duplicated qd into map qd:%d\n", cur_qd);
-        }else{
-            // save the qd_fd mapping
-            qd_item_ptr = (struct qd_map_item*) malloc(sizeof(*qd_item_ptr));
-            qd_item_ptr->qd = cur_qd;
-            qd_item_ptr->fd = cur_fd;
-            HASH_ADD_INT(server.el->fd_qd_map, fd, qd_item_ptr);
-            fprintf(stderr, "insert into map: qd:%d fd:%d\n", cur_qd, qd_item_ptr->fd);
-        }**/
         fprintf(stderr, "server.c/initServer@@@@@@  listen_qds[%d] = %d listen_qd_sum:%d\n", ii, server.ipfd[ii], server.el->listen_qd_sum);
     }
 

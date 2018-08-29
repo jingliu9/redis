@@ -699,7 +699,6 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(el);
     UNUSED(mask);
     UNUSED(privdata);
-    //printf("acceptTcpHandler @@@@@@ max:%d fd:%d\n", max, fd);
 
     while(max--) {
         cfd = anetTcpAccept(server.neterr, fd, cip, sizeof(cip), &cport);
@@ -718,24 +717,6 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
             return;
         }
         fprintf(stderr, "accept cfd:%d\n", cfd);
-        /***************
-        struct qd_map_item *qd_item_ptr;
-        struct qd_map_item *qd_item_found;
-        int cur_qd = cfd;
-        int cur_fd = zeus_qd2fd(cur_qd);
-        serverLog(LL_VERBOSE,"Accepted %s:%d  cqd:%d", cip, cport, cfd);
-        // save the accepted fd
-        HASH_FIND_INT(server.el->fd_qd_map, &cur_qd, qd_item_found);
-        if(qd_item_found != NULL){
-            fprintf(stderr, "WARNING: add duplicated qd into map qd:%d\n", cur_qd);
-        }else{
-            // save the qd_fd mapping
-            qd_item_ptr = (struct qd_map_item*) malloc(sizeof(*qd_item_ptr));
-            qd_item_ptr->fd = cur_fd;
-            qd_item_ptr->qd = cur_qd;
-            HASH_ADD_INT(server.el->fd_qd_map, fd, qd_item_ptr);
-            fprintf(stderr, "acceptTcpHandler: insert mapping qd:%d fd:%d\n", qd_item_ptr->qd, qd_item_ptr->fd);
-        }*****************/
         acceptCommonHandler(cfd,0,cip);
     }
 }
