@@ -80,12 +80,13 @@ int listMatchObjects(void *a, void *b) {
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
     if(REDIS_ZEUS_DEBUG) printf("createClient fd:%d\n", fd);
-    fprintf(stderr, "createClient for fd:%d\n", fd);
+    fprintf(stderr, "createClient for qd:%d realfd:%d\n", fd, zeus_qd2fd(fd));
 
     /* passing -1 as fd it is possible to create a non connected client.
      * This is useful since all the commands needs to be executed
      * in the context of a client. When commands are executed in other
      * contexts (for instance a Lua script) we need a non connected client. */
+    /**
     if (fd != -1) {
         anetNonBlock(NULL,fd);
         anetEnableTcpNoDelay(NULL,fd);
@@ -98,8 +99,17 @@ client *createClient(int fd) {
             zfree(c);
             return NULL;
         }
-    }
+    }**/
 
+    /* _JL_ */
+    if(fd != -1){
+        add_queue_status_item(server.el, fd, LIBOS_Q_STATUS_read_nopop);
+        struct qd_status *ret_qd_status = find_queue_status_item(server.el, fd);
+        (ret_qd_status->status_token_arr)[2] = c;
+    }
+    //////////
+
+    fprintf(stderr, "createClient before select DB\n");
     selectDb(c,0);
     uint64_t client_id;
     atomicGetIncr(server.next_client_id,client_id,1);
@@ -624,7 +634,7 @@ int clientHasPendingReplies(client *c) {
 #define MAX_ACCEPTS_PER_CALL 1000
 static void acceptCommonHandler(int fd, int flags, char *ip) {
     client *c;
-    if(REDIS_ZEUS_DEBUG) printf("acceptCommonHandler fd %d\n", fd);
+    fprintf(stderr, "acceptCommonHandler fd %d\n", fd);
     if ((c = createClient(fd)) == NULL) {
         serverLog(LL_WARNING,
             "Error registering fd event for the new client: %s (fd=%d)",
@@ -632,6 +642,12 @@ static void acceptCommonHandler(int fd, int flags, char *ip) {
         close(fd); /* May be already closed, just ignore errors */
         return;
     }
+
+    /* _JL_ save the client here */
+    struct qd_status *qd_status_ptr = find_queue_status_item(server.el, fd);
+    qd_status_ptr->status_token_arr[2] = (zeus_qtoken)(c);
+
+
     /* If maxclient directive is set and this is one client more... close the
      * connection. Note that we create the client instead to check before
      * for this condition, since now the socket is already set in non-blocking
@@ -695,6 +711,8 @@ static void acceptCommonHandler(int fd, int flags, char *ip) {
 
 void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     int cport, cfd, max = MAX_ACCEPTS_PER_CALL;
+    // _JL_ here, we can only accept one client at a time
+    max = 1;
     char cip[NET_IP_STR_LEN];
     UNUSED(el);
     UNUSED(mask);
@@ -702,21 +720,22 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
 
     while(max--) {
         cfd = anetTcpAccept(server.neterr, fd, cip, sizeof(cip), &cport);
-        //fprintf("acceptTcpHandler :%d\n", cfd);
-        if(cfd == ANET_ERR && errno == EAGAIN){
+        fprintf(stderr, "acceptTcpHandler return cfd:%d\n", cfd);
+        if(cfd == ANET_ERR){
+			if (errno != EWOULDBLOCK){
+                 serverLog(LL_WARNING,
+                     "Accepting client connection: %s", server.neterr);
             return;
+            }
         }
-        if(cfd == zeus_qd2fd(cfd)){
-            fprintf(stderr, "ERROR cfd:%d\n", cfd);
-            exit(1);
-        }
+        // record cfd
         if (cfd == ANET_ERR) {
             if (errno != EWOULDBLOCK)
                 serverLog(LL_WARNING,
                     "Accepting client connection: %s", server.neterr);
             return;
         }
-        fprintf(stderr, "accept cfd:%d\n", cfd);
+        fprintf(stderr, "acceptTcpHandler will call acceptCommandHandler cfd:%d\n", cfd);
         acceptCommonHandler(cfd,0,cip);
     }
 }

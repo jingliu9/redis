@@ -101,7 +101,7 @@ typedef struct aeFiredEvent {
 #define LIBOS_Q_STATUS_NONE (INT_MIN)
 #define LIBOS_Q_STATUS_listen_inwait (-2)
 #define LIBOS_Q_STATUS_listen_nopop (-1)
-#define LIBOS_Q_STATUS_read_nonpop (1)
+#define LIBOS_Q_STATUS_read_nopop (1)
 #define LIBOS_Q_STATUS_read_inwait (2)
 // NOTE, if later needs to support wait on push()
 // could just use numbers like 100, 101, etc.
@@ -116,7 +116,7 @@ typedef struct aeFiredEvent {
 
 struct qd_status {
     int qd;            /* we'll use this field as the key */
-    zeus_qtoken status_token_arr[2]; /* [status][qtoken] */
+    zeus_qtoken status_token_arr[3]; /* [status][qtoken][client_ptr] */
     UT_hash_handle hh; /* makes this structure hashable */
 };
 
@@ -139,6 +139,7 @@ typedef struct aeEventLoop {
     struct qd_status *qd_status_array;   /* use to allocate the data struct by batching*/
     int qd_status_array_index;         /* current index of free qd_status item in array */
     zeus_qtoken *wait_qtokens;
+    zeus_sgarray *sgarray_list;        // corresponding to qtoken (offset)
     /////////
 } aeEventLoop;
 

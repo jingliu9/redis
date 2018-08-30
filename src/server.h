@@ -585,6 +585,8 @@ typedef struct RedisModuleDigest {
 #define LRU_CLOCK_RESOLUTION 1000 /* LRU clock resolution in ms */
 
 #define OBJ_SHARED_REFCOUNT INT_MAX
+
+
 typedef struct redisObject {
     unsigned type:4;
     unsigned encoding:4;
@@ -607,6 +609,8 @@ typedef struct redisObject {
 } while(0)
 
 struct evictionPoolEntry; /* Defined in evict.c */
+
+
 
 /* Redis database representation. There are multiple databases identified
  * by integers from 0 (the default database) up to the max configured
@@ -2022,7 +2026,7 @@ void _serverAssert(const char *estr, const char *file, int line);
 void _serverPanic(const char *file, int line, const char *msg, ...);
 void bugReportStart(void);
 void serverLogObjectDebugInfo(const robj *o);
-void sigsegvHandler(int sig, siginfo_t *info, void *secret);
+//void sigsegvHandler(int sig, siginfo_t *info, void *secret);
 sds genRedisInfoString(char *section);
 void enableWatchdog(int period);
 void disableWatchdog(void);

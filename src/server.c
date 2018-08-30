@@ -28,6 +28,7 @@
  */
 
 #include "server.h"
+#include "server_sig.h"
 #include "cluster.h"
 #include "slowlog.h"
 #include "bio.h"

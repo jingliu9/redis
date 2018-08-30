@@ -571,14 +571,6 @@ static int anetGenericAccept(char *err, int s, struct sockaddr *sa, socklen_t *l
         //qt = zeus_pop(s,&sga);
         fd = zeus_accept(s, sa, len);
         int real_fd = zeus_qd2fd(fd);
-        fprintf(stderr, "zeus_accept returns qd:%d fd:%d\n", fd, real_fd);
-        if(fd == 0 || fd == real_fd){
-            if(fd != 0){
-                zeus_close(fd);
-            }
-            errno = EAGAIN;
-            return ANET_ERR;
-        }
         fprintf(stderr, "anetGenericAccept accepted qd:%d fd:%d\n", fd, real_fd);
         if (fd == -1) {
             if (errno == EINTR)
@@ -597,7 +589,6 @@ int anetTcpAccept(char *err, int s, char *ip, size_t ip_len, int *port) {
     int fd;
     struct sockaddr_storage sa;
     socklen_t salen = sizeof(sa);
-    //printf("_JL_@@@ anet.c/anetTcpAccept s:%d\n", s);
     if ((fd = anetGenericAccept(err,s,(struct sockaddr*)&sa,&salen)) == -1)
         return ANET_ERR;
 
@@ -610,6 +601,7 @@ int anetTcpAccept(char *err, int s, char *ip, size_t ip_len, int *port) {
         if (ip) inet_ntop(AF_INET6,(void*)&(s->sin6_addr),ip,ip_len);
         if (port) *port = ntohs(s->sin6_port);
     }
+    fprintf(stderr, "anetTcpAccept return:%d\n", fd);
     return fd;
 }
 
