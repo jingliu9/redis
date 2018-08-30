@@ -60,6 +60,31 @@
     #endif
 #endif
 
+int add_queue_status_item(aeEventLoop *eventLoop, int qd, int status) {
+    int qd_status_index = eventLoop->qd_status_array_index;
+    struct qd_status *new_status = &(eventLoop->qd_status_array[qd_status_index]);
+    eventLoop->qd_status_array_index++;
+    // initialize queue status
+    new_status->qd = qd;
+    (new_status->status_token_arr)[0] = status;
+    (new_status->status_token_arr)[1] = -1;
+    HASH_ADD_INT(eventLoop->qd_status_map, qd, new_status);
+    return qd_status_index;
+}
+
+struct qd_status* find_queue_status_item(aeEventLoop* eventLoop, int qd) {
+    struct qd_status *qd_status_ptr;
+    HASH_FIND_INT(eventLoop->qd_status_map, &qd, qd_status_ptr);
+    return qd_status_ptr;
+}
+
+int del_queue_status_item(aeEventLoop *eventLoop, int qd){
+    struct qd_status *qd_status_ptr = find_queue_status_item(eventLoop, qd);
+    if(qd_status_ptr == NULL){
+        return -1;
+    }
+    HASH_DEL(eventLoop->qd_status_map, qd_status_ptr);
+}
 
 aeEventLoop *aeCreateEventLoop(int setsize) {
     aeEventLoop *eventLoop;
@@ -80,10 +105,12 @@ aeEventLoop *aeCreateEventLoop(int setsize) {
     /* _JL_ init qd status map */
     // NOTE events always use fd as index
     eventLoop->qd_status_map = NULL;  /* required init for hash data structure */
-    eventLoop->qd_status_array = zmalloc(sizeof(aeFiredEvent)*setsize);
+    eventLoop->qd_status_array = zmalloc(sizeof(struct qd_status)*setsize);
+    eventLoop->wait_qtokens = zmalloc(sizeof(zeus_qtoken));
     eventLoop->qd_status_array_index = 0;
     for(i = 0; i < setsize; i++){
-        eventLoop->qd_status_array[i].status = LIBOS_Q_STATUS_NONE;
+        (eventLoop->qd_status_array[i].status_token_arr)[0] = LIBOS_Q_STATUS_NONE;
+        (eventLoop->qd_status_array[i].status_token_arr)[1] = -1;
     }
     /**************************/
 
@@ -99,6 +126,7 @@ err:
         zfree(eventLoop->events);
         zfree(eventLoop->fired);
         zfree(eventLoop->qd_status_array);
+        zfree(eventLoop->wait_qtokens);
         zfree(eventLoop);
     }
     return NULL;
@@ -128,13 +156,15 @@ int aeResizeSetSize(aeEventLoop *eventLoop, int setsize) {
     eventLoop->setsize = setsize;
 
     /* _JL_ re-init in re-size */
-    eventLoop->qd_status_array = zrealloc(eventLoop->qd_status_array,sizeof(aeFileEvent)*setsize);
+    eventLoop->qd_status_array = zrealloc(eventLoop->qd_status_array,sizeof(struct qd_status)*setsize);
+    eventLoop->wait_qtokens = zrealloc(eventLoop->wait_qtokens, sizeof(zeus_qtoken));
 
     /* Make sure that if we created new slots, they are initialized with
      * an AE_NONE mask. */
     for (i = eventLoop->maxfd+1; i < setsize; i++) {
         eventLoop->events[i].mask = AE_NONE;
-        eventLoop->qd_status_array[i].status = LIBOS_Q_STATUS_NONE;
+        (eventLoop->qd_status_array[i].status_token_arr)[0] = LIBOS_Q_STATUS_NONE;
+        (eventLoop->qd_status_array[i].status_token_arr)[1] = -1;
     }
     return AE_OK;
 }
@@ -445,42 +475,6 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         /* Call the multiplexing API, will return only on timeout or when
          * some event fires. */
         //numevents = aeApiPoll(eventLoop, tvp);
-        numevents = eventLoop->listen_qd_sum + eventLoop->read_qd_sum + eventLoop->write_qd_sum;
-        if(numevents < 0){
-            // fprintf(stderr, "numevents error: %d\n", numevents);
-        }
-        //printf("@@@@@@numevents:%d listen_fd_sum:%d read_fd_sum:%d write_fd_sum:%d\n", numevents, eventLoop->listen_qd_sum, eventLoop->read_qd_sum, eventLoop->write_qd_sum);
-
-        /* _JL_ loop to process READABLE events (accept() and read()) */
-        // simply add all the events to fired list, assume check returned err and errno to avoid exiting
-        int ii, jj, kk;
-        jj = 0;
-        for(ii = 0; ii < eventLoop->listen_qd_sum; ii++){
-            int qd = eventLoop->listen_qds[ii];
-            eventLoop->fired[jj].fd = zeus_qd2fd(qd);
-            eventLoop->fired[jj].qd = qd;
-            eventLoop->fired[jj].mask = AE_READABLE;
-            fprintf(stderr, "listen_qds[%d] is %d, jj:%d fd:%d\n", ii, eventLoop->listen_qds[ii], jj, eventLoop->fired[jj].fd);
-            jj++;
-        }
-        for(ii = 0; ii < eventLoop->read_qd_sum; ii++){
-            int qd = eventLoop->read_qds[ii];
-            int is_listening = 0;
-            for(kk = 0; kk < eventLoop->listen_qd_sum; kk++){
-                if(qd == eventLoop->listen_qds[kk]){
-                    is_listening = 1;
-                    break;
-                }
-            }
-            if(is_listening == 0){
-                eventLoop->fired[jj].fd = zeus_qd2fd(qd);
-                eventLoop->fired[jj].qd = qd;
-                eventLoop->fired[jj].mask = AE_READABLE;
-                fprintf(stderr, "read_qds[%d] is %d, jj:%d fd:%d\n", ii, eventLoop->read_qds[ii], jj, eventLoop->fired[jj].fd);
-                jj++;
-            }
-        }
-        numevents = jj;
 
         /* After sleep callback. */
         if (eventLoop->aftersleep != NULL && flags & AE_CALL_AFTER_SLEEP)

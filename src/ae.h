@@ -36,6 +36,7 @@
 #include <time.h>
 #include <limits.h>
 #include "uthash.h"
+#include "inc_libos.h"
 
 #define AE_OK 0
 #define AE_ERR -1
@@ -115,7 +116,7 @@ typedef struct aeFiredEvent {
 
 struct qd_status {
     int qd;            /* we'll use this field as the key */
-    int status;
+    zeus_qtoken status_token_arr[2]; /* [status][qtoken] */
     UT_hash_handle hh; /* makes this structure hashable */
 };
 
@@ -137,9 +138,15 @@ typedef struct aeEventLoop {
     struct qd_status *qd_status_map;   /* use to operate this hash map */
     struct qd_status *qd_status_array;   /* use to allocate the data struct by batching*/
     int qd_status_array_index;         /* current index of free qd_status item in array */
+    zeus_qtoken *wait_qtokens;
     /////////
 } aeEventLoop;
 
+/* prototypes for queue status */
+int add_queue_status_item(aeEventLoop *eventLoop, int qd, int status);
+struct qd_status* find_queue_status_item(aeEventLoop* eventLoop, int qd);
+int del_queue_status_item(aeEventLoop *eventLoop, int qd);
+zeus_qtoken* walk_queue_status_map(aeEventLoop *eventLoop);
 
 /* Prototypes */
 aeEventLoop *aeCreateEventLoop(int setsize);

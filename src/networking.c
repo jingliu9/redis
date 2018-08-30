@@ -1042,8 +1042,6 @@ int writeToClient(int fd, client *c, int handler_installed) {
         }
     }
     if(REDIS_ZEUS_DEBUG) printf("return from writeToClient\n");
-    server.el->write_qds[fd] = -1;
-    server.el->write_qd_sum--;
     return C_OK;
 }
 

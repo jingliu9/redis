@@ -503,7 +503,7 @@ static int _anetTcpServer(char *err, int port, char *bindaddr, int af, int backl
     for (p = servinfo; p != NULL; p = p->ai_next) {
         //if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
         s = zeus_socket(p->ai_family,p->ai_socktype,p->ai_protocol);
-        // printf("_JL_@@@anet.c/_anetTcpServer:zeus_queue return:%d\n", s);
+        fprintf(stderr, "_anetTcpServer: return of zeus_socket:%ld\n", s);
         if(s == -1){
             continue;
         }

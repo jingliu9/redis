@@ -1361,6 +1361,7 @@ void initServerConfig(void) {
     server.unixsocket = NULL;
     server.unixsocketperm = CONFIG_DEFAULT_UNIX_SOCKET_PERM;
     server.ipfd_count = 0;
+    server.ipqd_count = 0;
     server.sofd = -1;
     server.protected_mode = CONFIG_DEFAULT_PROTECTED_MODE;
     server.dbnum = CONFIG_DEFAULT_DBNUM;
@@ -1715,7 +1716,11 @@ void checkTcpBacklogSettings(void) {
  * impossible to bind, or no bind addresses were specified in the server
  * configuration but the function is not able to bind * for at least
  * one of the IPv4 or IPv6 protocols. */
-int listenToPort(int port, int *fds, int *count) {
+int listenToPortOrig(int port, int *fds, int *count){
+    fprintf(stderr, "ERROR, listenToPort(port, fds, count) not supported\n");
+    return -1;
+}
+int listenToPort(int port, int *fds, int *qds, int *count, int *qd_count) {
     int j;
 
     /* Force binding of 0.0.0.0 if no bind address is specified, always
@@ -1728,7 +1733,7 @@ int listenToPort(int port, int *fds, int *count) {
              * server.bindaddr_count == 0. */
             /* _JL_ not bind to ipv6 and forace it to ipv4 by emulating unsupport ipv6 */
             unsupported = 1;
-            /* 
+            /*
             fds[*count] = anetTcp6Server(server.neterr,port,NULL, server.tcp_backlog);
             if (fds[*count] != ANET_ERR) {
                 anetNonBlock(NULL,fds[*count]);
@@ -1740,10 +1745,13 @@ int listenToPort(int port, int *fds, int *count) {
 
             if (*count == 1 || unsupported) {
                 /* Bind the IPv4 address as well. */
-                fds[*count] = anetTcpServer(server.neterr,port,NULL, server.tcp_backlog);
+                qds[*qd_count] = anetTcpServer(server.neterr,port,NULL, server.tcp_backlog);
+                fprintf(stderr, "1-call anetTcpServer return: %d\n", qds[*qd_count]);
+                fds[*count] = zeus_qd2fd(qds[*qd_count]);
                 if (fds[*count] != ANET_ERR) {
                     anetNonBlock(NULL,fds[*count]);
                     (*count)++;
+                    (*qd_count)++;
                 } else if (errno == EAFNOSUPPORT) {
                     unsupported++;
                     serverLog(LL_WARNING,"Not listening to IPv4: unsupproted");
@@ -1760,8 +1768,10 @@ int listenToPort(int port, int *fds, int *count) {
             fprintf(stderr, "_JL_@@@ error: server.bindaddr[%d] is ipv6 addr. WE DO NOT HANDLE THIS!\n", j);
         } else {
             /* Bind IPv4 address. */
-            fds[*count] = anetTcpServer(server.neterr,port,server.bindaddr[j],
+            qds[*qd_count] = anetTcpServer(server.neterr,port,server.bindaddr[j],
                 server.tcp_backlog);
+            fprintf(stderr, "2-call anetTcpServer return:%d\n", qds[*qd_count]);
+            fds[*count] = zeus_qd2fd(qds[*qd_count]);
         }
         if (fds[*count] == ANET_ERR) {
             serverLog(LL_WARNING,
@@ -1772,6 +1782,7 @@ int listenToPort(int port, int *fds, int *count) {
         }
         anetNonBlock(NULL,fds[*count]);
         (*count)++;
+        (*qd_count)++;
     }
     return C_OK;
 }
@@ -1852,20 +1863,15 @@ void initServer(void) {
 
     /* Open the TCP listening socket for the user commands. */
     if (server.port != 0 &&
-        listenToPort(server.port,server.ipfd,&server.ipfd_count) == C_ERR)
+        listenToPort(server.port,server.ipfd,server.ipqd, &server.ipfd_count,&server.ipqd_count) == C_ERR)
         exit(1);
 
     /* _JL_ record the listening port */
-    int ii;
-    assert(server.el->listen_qd_sum == 0);
-    for(ii = 0; ii < server.ipfd_count; ii++) {
-        int cur_qd = server.ipfd[ii];
-        int cur_fd = zeus_qd2fd(cur_qd);
-        server.el->listen_qds[server.el->listen_qd_sum] = cur_qd;
-        server.el->listen_qd_sum++;
-        fprintf(stderr, "server.c/initServer@@@@@@  listen_qds[%d] = %d listen_qd_sum:%d\n", ii, server.ipfd[ii], server.el->listen_qd_sum);
+    int ii = 0;
+    for(ii = 0; ii < server.ipqd_count; ii++) {
+        add_queue_status_item(server.el, server.ipqd[ii], LIBOS_Q_STATUS_listen_nopop);
+        fprintf(stderr, "initServer listening qd:%ld\n", server.ipqd[ii]);
     }
-
 
     /* Open the listening Unix domain socket. */
     if (server.unixsocket != NULL) {
@@ -1938,7 +1944,6 @@ void initServer(void) {
 
     /* Create an event handler for accepting new connections in TCP and Unix
      * domain sockets. */
-    printf("server.c/initServer@@@@@@ ipfd_count:%d\n", server.ipfd_count);
     for (j = 0; j < server.ipfd_count; j++) {
         if (aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
             acceptTcpHandler,NULL) == AE_ERR)
