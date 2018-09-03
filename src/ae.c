@@ -523,7 +523,6 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                 qtoken_index++;
                 continue;
             }
-            // we let push() finishing point to set the status back to nopop
             if((qd_status_iterptr->status_token_arr)[0] == LIBOS_Q_STATUS_read_nopop){
                 fprintf(stderr, "before pop for read qd:%d\n", qd_status_iterptr->qd);
                 zeus_qtoken qt = zeus_pop(qd_status_iterptr->qd, sga_ptr);
@@ -538,6 +537,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                     c->sga_ptr = sga_ptr;
                     sga_ptr++;
                     readQueryFromClient(eventLoop, qd_status_iterptr->qd, c, 0);
+                    (qd_status_iterptr->status_token_arr)[0] = LIBOS_Q_STATUS_read_nopop;
                     qtoken_index = 0;
                     processed++;
                     break;
@@ -588,6 +588,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                 c->sga_ptr = sga_ptr;
                 sga_ptr++;
                 readQueryFromClient(eventLoop, ret_qd_status->qd, c, 0);
+                (ret_qd_status->status_token_arr)[0] = LIBOS_Q_STATUS_read_nopop;
             }else{
                 // ERROR
             }
