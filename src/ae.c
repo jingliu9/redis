@@ -643,7 +643,6 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 
             processed++;
         }
-        //free(sga_ptr);
     }
     /* Check time events */
     if (flags & AE_TIME_EVENTS)
