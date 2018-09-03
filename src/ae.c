@@ -487,6 +487,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         //zeus_sgarray sga;
         int ii, jj;
         int qtoken_index = 0;
+        int sga_index = 0;
         struct qd_status *qd_status_iterptr;
         // set numevents to 0, and then redis event mechanism will not be triggered
         numevents = 0;
@@ -534,6 +535,8 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                         fprintf(stderr, "ERROR, client not created for qd:%d\n",
                                 qd_status_iterptr->qd);
                     }
+                    c->sga_ptr = sga_ptr;
+                    sga_ptr++;
                     readQueryFromClient(eventLoop, qd_status_iterptr->qd, c, 0);
                     qtoken_index = 0;
                     processed++;
@@ -550,6 +553,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
             }
 
             if((qd_status_iterptr->status_token_arr)[0] == LIBOS_Q_STATUS_read_inwait){
+                fprintf(stderr, "LIBOS_Q_STATUS_read_inwait qd:%d\n",qd_status_iterptr->qd);
                 zeus_qtoken qt = (qd_status_iterptr->status_token_arr)[1];
                 eventLoop->wait_qtokens[qtoken_index] = qt;
                 qtoken_index++;
@@ -581,6 +585,8 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                     fprintf(stderr, "ERROR, client not created for qd:%d\n",
                             ret_qd_status->qd);
                 }
+                c->sga_ptr = sga_ptr;
+                sga_ptr++;
                 readQueryFromClient(eventLoop, ret_qd_status->qd, c, 0);
             }else{
                 // ERROR

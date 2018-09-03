@@ -1462,6 +1462,8 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(mask);
     UNUSED(nwait);
 
+    fprintf(stderr, "readQueryFromClient for qd:%d\n", fd);
+
 #ifdef _LIBOS_MEASURE_REDIS_APP_LOGIC_
     uint64_t init_tick = rdtsc();
 #endif
@@ -1491,8 +1493,8 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
 #endif
     //printf("netoworking.c@@@@@@readQueryFromClient/read(%d)\n", fd);
     //nread = read(fd, c->querybuf+qblen, readlen);
-    zeus_sgarray sga;
     /**
+    zeus_sgarray sga;
     // Use zeus_pop
     npop = zeus_pop(fd, &sga);
     if (npop == 0){
@@ -1504,7 +1506,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
         // nread = sga.bufs[0].len;
         // printf("return value of nwait:%d nread:%d\n", nwait, nread);
     }
-    //printf("@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
+    fprintf(stderr, "@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
     **/
 
 #ifdef _LIBOS_MEASURE_REDIS_NETWORKING_POP_ID_
@@ -1512,7 +1514,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     rcd_start = rdtsc();
 #endif
     // use peek
-    npop = zeus_peek(fd, &sga);
+    //npop = zeus_peek(fd, &sga);
 
 #ifdef _LIBOS_MEASURE_REDIS_NETWORKING_POP_ID_
     rcd_end = rdtsc();
@@ -1520,6 +1522,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
         fprintf(stderr,"mpoint:%d time_tick:%lu\n", (_LIBOS_MEASURE_REDIS_NETWORKING_POP_ID_), (rcd_end - rcd_start));
     }
 #endif
+    /**
     if(npop <= 0){
         // make sure handled as EAGAIN
         nread = -1;
@@ -1531,12 +1534,16 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
             exit(1);
         }
         npop = 0;
-    }
+    }**/
 
 
 #ifdef _LIBOS_MEASURE_REDIS_APP_LOGIC_
     uint64_t start_process_tick = rdtsc();
 #endif
+    npop = 0;
+    zeus_sgarray sga = *(c->sga_ptr);
+    nread = sga.bufs[0].len;
+    fprintf(stderr, "@@@@@@return value from zeus_pop() npop:%d nread:%d\n", npop, nread);
     char *ptr = (char*)(sga.bufs[0].buf);
     if (npop > 0 || npop == C_ZEUS_IO_ERR_NO) {
         // regard as EAGAIN
