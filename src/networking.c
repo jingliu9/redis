@@ -996,7 +996,7 @@ int writeToClient(int fd, client *c, int handler_installed) {
 
             // ZEUS
             //nwritten = write(fd, o + c->sentlen, objlen - c->sentlen);
-            printf("NO call here\n");
+            fprintf(stderr, "NO call here\n");
             exit(1);
             nwritten = write(fd, o + c->sentlen, objlen - c->sentlen);
             if (nwritten <= 0) break;

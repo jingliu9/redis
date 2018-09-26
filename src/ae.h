@@ -140,6 +140,8 @@ typedef struct aeEventLoop {
     int qd_status_array_index;         /* current index of free qd_status item in array */
     zeus_qtoken *wait_qtokens;
     zeus_sgarray *sgarray_list;        // corresponding to qtoken (offset)
+    //
+    zeus_sgarray *bench_sga_ptr;
     /////////
 } aeEventLoop;
 

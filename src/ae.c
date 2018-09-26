@@ -535,6 +535,9 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                                 qd_status_iterptr->qd);
                     }
                     c->sga_ptr = sga_ptr;
+                    // for bench-client
+                    eventLoop->bench_sga_ptr = sga_ptr;
+                    /////////
                     sga_ptr++;
                     readQueryFromClient(eventLoop, qd_status_iterptr->qd, c, 0);
                     (qd_status_iterptr->status_token_arr)[0] = LIBOS_Q_STATUS_read_nopop;
@@ -567,7 +570,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         if(qtoken_index > 0){
             int ret_offset = -1, ret_qd = 0;
             ssize_t ret = zeus_wait_any(eventLoop->wait_qtokens, qtoken_index, &ret_offset, &ret_qd, sga_ptr);
-            fprintf(stderr, "waitany return qd:%d\n", ret_qd);
+            fprintf(stderr, "waitany return qd:%d ret_value:%ld\n", ret_qd, ret);
             struct qd_status *ret_qd_status = find_queue_status_item(eventLoop, ret_qd);
             if(ret_qd_status == NULL){
                 fprintf(stderr, "ERROR ret_qd_status is NULL for qd:%d\n", ret_qd);
@@ -585,7 +588,11 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                     fprintf(stderr, "ERROR, client not created for qd:%d\n",
                             ret_qd_status->qd);
                 }
+                fprintf(stderr, "aeProcessEvent, assign asg_ptr:%p to client_addr:%p\n", sga_ptr, c);
                 c->sga_ptr = sga_ptr;
+                // for bench-client
+                eventLoop->bench_sga_ptr = sga_ptr;
+                /////////
                 sga_ptr++;
                 readQueryFromClient(eventLoop, ret_qd_status->qd, c, 0);
                 (ret_qd_status->status_token_arr)[0] = LIBOS_Q_STATUS_read_nopop;
