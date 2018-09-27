@@ -566,7 +566,7 @@ int anetUnixServer(char *err, char *path, mode_t perm, int backlog)
 
 static int anetGenericAccept(char *err, int s, struct sockaddr *sa, socklen_t *len) {
     int fd;
-    zeus_sgarray sga;
+    //zeus_sgarray sga;
     while(1) {
         //qt = zeus_pop(s,&sga);
         fd = zeus_accept(s, sa, len);
