@@ -120,6 +120,7 @@ struct qd_status {
     UT_hash_handle hh; /* makes this structure hashable */
 };
 
+#define _SGA_ALLOC_FACTOR 32
 
 /* State of an event based program */
 typedef struct aeEventLoop {
@@ -140,7 +141,7 @@ typedef struct aeEventLoop {
     int qd_status_array_index;         /* current index of free qd_status item in array */
     zeus_qtoken *wait_qtokens;
     zeus_sgarray *sgarray_list;        // corresponding to qtoken (offset)
-    //
+    int sga_idx;
     zeus_sgarray *bench_sga_ptr;
     /////////
 } aeEventLoop;

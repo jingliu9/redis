@@ -88,6 +88,26 @@ int del_queue_status_item(aeEventLoop *eventLoop, int qd){
     HASH_DEL(eventLoop->qd_status_map, qd_status_ptr);
 }
 
+zeus_sgarray* use_sgarray(aeEventLoop *eventLoop){
+    zeus_sgarray *sga_ptr;
+    if(eventLoop->sga_idx < (eventLoop->setsize*(_SGA_ALLOC_FACTOR))){
+        sga_ptr = &(eventLoop->sgarray_list[eventLoop->sga_idx]);
+        eventLoop->sga_idx++;
+    }else{
+        fprintf(stderr, "ERROR no avaiable sga\n");
+        // error here
+        return NULL;
+    }
+    //memset(sga_ptr, 0, sizeof(zeus_sgarray));
+    sga_ptr->num_bufs = 0;
+    fprintf(stderr, "return sga_ptr:%p num_bufs:%d\n", sga_ptr, sga_ptr->num_bufs);
+    return sga_ptr;
+}
+
+int return_sgarray(aeEventLoop *eventLoop, zeus_sgarray* sga){
+    return -1;
+}
+
 aeEventLoop *aeCreateEventLoop(int setsize) {
     aeEventLoop *eventLoop;
     int i;
@@ -108,9 +128,10 @@ aeEventLoop *aeCreateEventLoop(int setsize) {
     // NOTE events always use fd as index
     eventLoop->qd_status_map = NULL;  /* required init for hash data structure */
     eventLoop->qd_status_array = zmalloc(sizeof(struct qd_status)*setsize);
-    eventLoop->wait_qtokens = zmalloc(sizeof(zeus_qtoken));
-    eventLoop->sgarray_list = zmalloc(sizeof(zeus_sgarray));
+    eventLoop->wait_qtokens = zmalloc(sizeof(zeus_qtoken)*setsize);
+    eventLoop->sgarray_list = zmalloc(sizeof(zeus_sgarray)*(setsize*(_SGA_ALLOC_FACTOR)));
     eventLoop->qd_status_array_index = 0;
+    eventLoop->sga_idx = 0;
     for(i = 0; i < setsize; i++){
         (eventLoop->qd_status_array[i].status_token_arr)[0] = LIBOS_Q_STATUS_NONE;
         (eventLoop->qd_status_array[i].status_token_arr)[1] = -1;
@@ -162,8 +183,8 @@ int aeResizeSetSize(aeEventLoop *eventLoop, int setsize) {
 
     /* _JL_ re-init in re-size */
     eventLoop->qd_status_array = zrealloc(eventLoop->qd_status_array,sizeof(struct qd_status)*setsize);
-    eventLoop->wait_qtokens = zrealloc(eventLoop->wait_qtokens, sizeof(zeus_qtoken));
-    eventLoop->sgarray_list = zrealloc(eventLoop->sgarray_list, sizeof(zeus_sgarray));
+    eventLoop->wait_qtokens = zrealloc(eventLoop->wait_qtokens, sizeof(zeus_qtoken)*setsize);
+    eventLoop->sgarray_list = zrealloc(eventLoop->sgarray_list, sizeof(zeus_sgarray)*(setsize*(_SGA_ALLOC_FACTOR)));
 
     /* Make sure that if we created new slots, they are initialized with
      * an AE_NONE mask. */
@@ -180,6 +201,11 @@ void aeDeleteEventLoop(aeEventLoop *eventLoop) {
     aeApiFree(eventLoop);
     zfree(eventLoop->events);
     zfree(eventLoop->fired);
+    /* _JL_ */
+    zfree(eventLoop->qd_status_array);
+    zfree(eventLoop->wait_qtokens);
+    zfree(eventLoop->sgarray_list);
+    //////////
     zfree(eventLoop);
 }
 
@@ -492,11 +518,13 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         // set numevents to 0, and then redis event mechanism will not be triggered
         numevents = 0;
         //zeus_sgarray *sga_ptr = malloc(sizeof(zeus_sgarray));
-        zeus_sgarray *sga_ptr = &(eventLoop->sgarray_list[0]);
+        //zeus_sgarray *sga_ptr = &(eventLoop->sgarray_list[0]);
+        zeus_sgarray *sga_ptr;
         for(qd_status_iterptr = eventLoop->qd_status_map; qd_status_iterptr != NULL;
                 qd_status_iterptr = qd_status_iterptr->hh.next){
             if((qd_status_iterptr->status_token_arr)[0] == LIBOS_Q_STATUS_listen_nopop){
                 // qd is listening and pop not called
+                sga_ptr = use_sgarray(eventLoop);
                 zeus_qtoken qt = zeus_pop(qd_status_iterptr->qd, sga_ptr);
                 fprintf(stderr, "after zeus_pop qt:%lu\n", qt);
                 if(qt == 0){
@@ -525,6 +553,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
             }
             if((qd_status_iterptr->status_token_arr)[0] == LIBOS_Q_STATUS_read_nopop){
                 fprintf(stderr, "before pop for read qd:%d\n", qd_status_iterptr->qd);
+                sga_ptr = use_sgarray(eventLoop);
                 zeus_qtoken qt = zeus_pop(qd_status_iterptr->qd, sga_ptr);
                 fprintf(stderr, "after pop for read qt:%lu\n", qt);
                 if(qt == 0){
@@ -538,7 +567,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                     // for bench-client
                     eventLoop->bench_sga_ptr = sga_ptr;
                     /////////
-                    sga_ptr++;
+                    //sga_ptr++;
                     readQueryFromClient(eventLoop, qd_status_iterptr->qd, c, 0);
                     (qd_status_iterptr->status_token_arr)[0] = LIBOS_Q_STATUS_read_nopop;
                     qtoken_index = 0;
@@ -569,6 +598,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         // now wait_any
         if(qtoken_index > 0){
             int ret_offset = -1, ret_qd = 0;
+            sga_ptr = use_sgarray(eventLoop);
             ssize_t ret = zeus_wait_any(eventLoop->wait_qtokens, qtoken_index, &ret_offset, &ret_qd, sga_ptr);
             fprintf(stderr, "waitany return qd:%d ret_value:%ld\n", ret_qd, ret);
             struct qd_status *ret_qd_status = find_queue_status_item(eventLoop, ret_qd);
@@ -593,7 +623,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                 // for bench-client
                 eventLoop->bench_sga_ptr = sga_ptr;
                 /////////
-                sga_ptr++;
+                //sga_ptr++;
                 readQueryFromClient(eventLoop, ret_qd_status->qd, c, 0);
                 (ret_qd_status->status_token_arr)[0] = LIBOS_Q_STATUS_read_nopop;
             }else{
