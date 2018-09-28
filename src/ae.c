@@ -100,7 +100,7 @@ zeus_sgarray* use_sgarray(aeEventLoop *eventLoop){
     }
     //memset(sga_ptr, 0, sizeof(zeus_sgarray));
     sga_ptr->num_bufs = 0;
-    fprintf(stderr, "return sga_ptr:%p num_bufs:%d\n", sga_ptr, sga_ptr->num_bufs);
+    //fprintf(stderr, "return sga_ptr:%p num_bufs:%d\n", sga_ptr, sga_ptr->num_bufs);
     return sga_ptr;
 }
 
@@ -526,7 +526,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                 // qd is listening and pop not called
                 sga_ptr = use_sgarray(eventLoop);
                 zeus_qtoken qt = zeus_pop(qd_status_iterptr->qd, sga_ptr);
-                fprintf(stderr, "after zeus_pop qt:%lu\n", qt);
+                //fprintf(stderr, "after zeus_pop qt:%lu\n", qt);
                 if(qt == 0){
                     // we could call accept here if qt == 0
                     acceptTcpHandler(eventLoop, qd_status_iterptr->qd, NULL, 0);
@@ -535,7 +535,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                     qtoken_index = 0;
                     break;
                 }else{
-                    fprintf(stderr, "aeProcessEvents, listen qd:%d from nonpop to inwait real_fd:%d\n", qd_status_iterptr->qd, zeus_qd2fd(qd_status_iterptr->qd));
+                    //fprintf(stderr, "aeProcessEvents, listen qd:%d from nonpop to inwait real_fd:%d\n", qd_status_iterptr->qd, zeus_qd2fd(qd_status_iterptr->qd));
                     // save the qt for accept
                     qd_status_iterptr->status_token_arr[1] = qt;
                     qd_status_iterptr->status_token_arr[0] = LIBOS_Q_STATUS_listen_inwait;
@@ -552,10 +552,10 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                 continue;
             }
             if((qd_status_iterptr->status_token_arr)[0] == LIBOS_Q_STATUS_read_nopop){
-                fprintf(stderr, "before pop for read qd:%d\n", qd_status_iterptr->qd);
+                //fprintf(stderr, "before pop for read qd:%d\n", qd_status_iterptr->qd);
                 sga_ptr = use_sgarray(eventLoop);
                 zeus_qtoken qt = zeus_pop(qd_status_iterptr->qd, sga_ptr);
-                fprintf(stderr, "after pop for read qt:%lu\n", qt);
+                //fprintf(stderr, "after pop for read qt:%lu\n", qt);
                 if(qt == 0){
                     zeus_qtoken client_addr = qd_status_iterptr->status_token_arr[2];
                     client *c = (client*)(client_addr);
@@ -582,7 +582,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
             }
 
             if((qd_status_iterptr->status_token_arr)[0] == LIBOS_Q_STATUS_read_inwait){
-                fprintf(stderr, "LIBOS_Q_STATUS_read_inwait qd:%d\n",qd_status_iterptr->qd);
+                //fprintf(stderr, "LIBOS_Q_STATUS_read_inwait qd:%d\n",qd_status_iterptr->qd);
                 zeus_qtoken qt = (qd_status_iterptr->status_token_arr)[1];
                 eventLoop->wait_qtokens[qtoken_index] = qt;
                 qtoken_index++;
@@ -590,25 +590,25 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
             }
         }
         for(ii = 0; ii < qtoken_index; ii++){
-            fprintf(stderr, "qtoken_index:%d qtoken is:%lu\n", ii, eventLoop->wait_qtokens[ii]);
+            //fprintf(stderr, "qtoken_index:%d qtoken is:%lu\n", ii, eventLoop->wait_qtokens[ii]);
         }
         // now wait_any
         if(qtoken_index > 0){
             int ret_offset = -1, ret_qd = 0;
             sga_ptr = use_sgarray(eventLoop);
             ssize_t ret = zeus_wait_any(eventLoop->wait_qtokens, qtoken_index, &ret_offset, &ret_qd, sga_ptr);
-            fprintf(stderr, "waitany return qd:%d\n", ret_qd);
+            //fprintf(stderr, "waitany return qd:%d\n", ret_qd);
             struct qd_status *ret_qd_status = find_queue_status_item(eventLoop, ret_qd);
             if(ret_qd_status == NULL){
                 fprintf(stderr, "ERROR ret_qd_status is NULL for qd:%d\n", ret_qd);
                 exit(1);
             }
             if(ret_qd_status->status_token_arr[0] == LIBOS_Q_STATUS_listen_inwait){
-                fprintf(stderr, "aeProcessEvents wait return qd:%d status is listen_inwait\n", ret_qd);
+               // fprintf(stderr, "aeProcessEvents wait return qd:%d status is listen_inwait\n", ret_qd);
                 acceptTcpHandler(eventLoop, ret_qd_status->qd, NULL, 0);
                 (ret_qd_status->status_token_arr)[0] = LIBOS_Q_STATUS_listen_nopop;
             }else if(ret_qd_status->status_token_arr[0] == LIBOS_Q_STATUS_read_inwait){
-                fprintf(stderr, "aeProcessEvents wait return qd:%d status is read_inwait\n", ret_qd);
+                //fprintf(stderr, "aeProcessEvents wait return qd:%d status is read_inwait\n", ret_qd);
                 zeus_qtoken client_addr = ret_qd_status->status_token_arr[2];
                 client *c = (client*)(client_addr);
                 if(c == NULL){
