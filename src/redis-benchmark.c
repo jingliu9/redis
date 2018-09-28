@@ -136,16 +136,10 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     UNUSED(fd);
     UNUSED(mask);
     /* _JL_ This is the actual readhandler, used by ae.c */
-    fprintf(stderr, "redis-Benchmark.c/readQueryFromClient\n");
+    //fprintf(stderr, "redis-Benchmark.c/readQueryFromClient\n");
     bench_client c = (bench_client) privdata;
-    fprintf(stderr, "client addr:%p\n", c);
     c->sga_ptr = el->bench_sga_ptr;
     c->context->sga_ptr = c->sga_ptr;
-    if(c->sga_ptr == NULL){
-        fprintf(stderr, "redis-Benchmark.c/readQueryFromClient sga_ptr is NULL\n");
-    }else{
-        fprintf(stderr, "c->sga_ptr: %p\n", c->sga_ptr);
-    }
     ///// copied from readHandler
     void *reply = NULL;
 
@@ -464,7 +458,7 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
 static bench_client createBenchClient(char *cmd, size_t len, bench_client from) {
     int j;
     bench_client c = zmalloc(sizeof(struct _client));
-    fprintf(stderr, "redis-benchmar.c@@@@@@createBencBenchClient\n");
+    //fprintf(stderr, "redis-benchmar.c@@@@@@createBencBenchClient\n");
 
     if (config.hostsocket == NULL) {
         c->context = redisConnectNonBlock(config.hostip,config.hostport);

@@ -796,53 +796,20 @@ int redisBufferRead(redisContext *c) {
     char buf[1024*16];
     int nread, npop, nwait;
 
-    fprintf(stderr, "deps/hiredis/hiredis.c/redisBufferRead\n");
+    //fprintf(stderr, "deps/hiredis/hiredis.c/redisBufferRead\n");
     /* Return early when the context has seen an error. */
     if (c->err){
         printf("hiredis/redisBufferRead c->err\n");
         return REDIS_ERR;
     }
 
-    if(HIREDIS_ZEUS_DEBUG) printf("hiredis/redisBufferRead before zeus_pop()\n");
     if(c->sga_ptr == NULL){
         fprintf(stderr, "ERROR sga_ptr is NULL\n");
     }
     zeus_sgarray sga = *(c->sga_ptr);
     nread = sga.bufs[0].len;
-    fprintf(stderr, "deps/hiredis/hiredis.c/redisBufferRead nread:%d\n", nread);
-    // ZEUS
-    //printf("@@@@@@redisBufferRead/read()\n");
-    //nread = read(c->fd,buf,sizeof(buf));
-    //zeus_sgarray sga;
-    /**
-    // use zeus_pop
-    npop = zeus_pop(c->fd, &sga);
-    if(npop == 0){
-        // pop success
-        nread = sga.bufs[0].len;
-    }else{
-        nread = -1;
-        nwait = zeus_wait(npop, &sga);
-        nread = sga.bufs[0].len;
-        printf("return value of nwait:%d nread:%d\n", nwait, nread);
-    }**/
+    //fprintf(stderr, "deps/hiredis/hiredis.c/redisBufferRead nread:%d\n", nread);
 
-    // use zeus_light_pop
-    /**
-    npop = zeus_peek(c->fd, &sga);
-    if(npop <= 0){
-        // make sure handled as EAGAIN
-        nread = -1;
-        npop = 1;
-    }else{
-        nread = npop;
-        if(nread != sga.bufs[0].len){
-            printf("Error, nread:%d, len:%d\n", nread, sga.bufs[0].len);
-            exit(1);
-        }
-        npop = 0;
-    }
-    **/
     char *ptr = (char*)(sga.bufs[0].buf);
     if(nread == C_ZEUS_IO_ERR_NO){
         // try again later
